@@ -5,10 +5,14 @@ import { api } from "@/convex/_generated/api";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import { SignInButton, UserButton } from "@clerk/nextjs";
+import Link from "next/link";
+import { useAppUser } from "./UserProvider";
 
 import { StatCard } from "./ui/StatCard";
 import { RankingTable } from "./RankingTable";
 import { StatusDistribution } from "./StatusDistribution";
+import { ProgressTimeline } from "./ProgressTimeline";
 import { MDACard } from "./MDACard";
 import { StatCardSkeleton, CardSkeleton, TableSkeleton } from "./ui/Skeleton";
 import { formatScore } from "@/lib/utils";
@@ -18,6 +22,7 @@ type ViewMode = "ranking" | "grid";
 
 export function Dashboard() {
   const router = useRouter();
+  const { isSignedIn, isAdmin, role, isLoading: userLoading } = useAppUser();
   const [viewMode, setViewMode] = useState<ViewMode>("ranking");
   const [searchQuery, setSearchQuery] = useState("");
   const [isInitializing, setIsInitializing] = useState(false);
@@ -108,18 +113,48 @@ export function Dashboard() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={handleSeed}
-                className="px-4 py-2 text-sm font-medium text-[#006B3F] bg-white border border-white/20 rounded-lg hover:bg-green-50 transition-colors shadow-md"
-              >
-                Seed Data
-              </button>
-              <button
-                onClick={handleClear}
-                className="px-4 py-2 text-sm font-medium text-white bg-white/10 border border-white/30 rounded-lg hover:bg-white/20 transition-colors"
-              >
-                Clear Data
-              </button>
+              {isAdmin && (
+                <>
+                  <Link
+                    href="/admin/users"
+                    className="px-4 py-2 text-sm font-medium text-white bg-white/10 border border-white/30 rounded-lg hover:bg-white/20 transition-colors"
+                  >
+                    Manage Users
+                  </Link>
+                  <button
+                    onClick={handleSeed}
+                    className="px-4 py-2 text-sm font-medium text-[#006B3F] bg-white border border-white/20 rounded-lg hover:bg-green-50 transition-colors shadow-md"
+                  >
+                    Seed Data
+                  </button>
+                  <button
+                    onClick={handleClear}
+                    className="px-4 py-2 text-sm font-medium text-white bg-white/10 border border-white/30 rounded-lg hover:bg-white/20 transition-colors"
+                  >
+                    Clear Data
+                  </button>
+                </>
+              )}
+              {isSignedIn ? (
+                <div className="flex items-center gap-2">
+                  {role && (
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      role === "admin" ? "bg-purple-200 text-purple-800" :
+                      role === "editor" ? "bg-blue-200 text-blue-800" :
+                      "bg-gray-200 text-gray-700"
+                    }`}>
+                      {role}
+                    </span>
+                  )}
+                  <UserButton afterSignOutUrl="/" />
+                </div>
+              ) : (
+                <SignInButton mode="modal">
+                  <button className="px-4 py-2 text-sm font-medium text-[#006B3F] bg-white rounded-lg hover:bg-green-50 transition-colors shadow-md">
+                    Sign In
+                  </button>
+                </SignInButton>
+              )}
             </div>
           </div>
         </div>
@@ -187,9 +222,15 @@ export function Dashboard() {
 
         {/* Status Distribution */}
         {stats && stats.totalMDAs > 0 && (
-          <section className="mb-8">
-            <StatusDistribution stats={stats as DashboardStats} />
-          </section>
+          <>
+            <section className="mb-8">
+              <StatusDistribution stats={stats as DashboardStats} />
+            </section>
+            
+            <section className="mb-8">
+              <ProgressTimeline />
+            </section>
+          </>
         )}
 
         {/* Rankings / Grid Toggle */}

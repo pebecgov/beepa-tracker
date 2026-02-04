@@ -1,6 +1,31 @@
 import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 
+// Helper function to check if user can edit
+async function canUserEdit(ctx: any, mdaId?: any): Promise<{ canEdit: boolean; userId?: string }> {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) return { canEdit: false };
+
+  const user = await ctx.db
+    .query("users")
+    .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
+    .first();
+
+  if (!user || !user.isActive) return { canEdit: false };
+
+  // Admins can edit everything
+  if (user.role === "admin") return { canEdit: true, userId: identity.subject };
+
+  // Editors can edit if no MDA restrictions or assigned to this MDA
+  if (user.role === "editor") {
+    if (!mdaId) return { canEdit: true, userId: identity.subject };
+    if (!user.assignedMDAs || user.assignedMDAs.length === 0) return { canEdit: true, userId: identity.subject };
+    return { canEdit: user.assignedMDAs.includes(mdaId), userId: identity.subject };
+  }
+
+  return { canEdit: false };
+}
+
 // Get all activities
 export const list = query({
   args: {},
@@ -28,7 +53,7 @@ export const get = query({
   },
 });
 
-// Update activity completion level
+// Update activity completion level (requires editor or admin role)
 export const updateCompletion = mutation({
   args: {
     id: v.id("activities"),
@@ -43,6 +68,16 @@ export const updateCompletion = mutation({
     const existing = await ctx.db.get(args.id);
     if (!existing) throw new Error("Activity not found");
 
+    // Get the MDA for this activity to check permissions
+    const reform = await ctx.db.get(existing.reformId);
+    if (!reform) throw new Error("Reform not found");
+
+    // Check if user can edit this MDA
+    const { canEdit, userId } = await canUserEdit(ctx, reform.mdaId);
+    if (!canEdit) {
+      throw new Error("You don't have permission to update this activity. Contact an admin to request editor access.");
+    }
+
     // Validate completion level
     if (args.completionLevel < 0 || args.completionLevel > 1) {
       throw new Error("Completion level must be between 0 and 1");
@@ -53,6 +88,7 @@ export const updateCompletion = mutation({
     await ctx.db.patch(args.id, {
       completionLevel: args.completionLevel,
       status: args.status,
+      lastUpdatedBy: userId,
       updatedAt: now,
     });
 
@@ -69,6 +105,7 @@ export const updateCompletion = mutation({
         completionLevel: args.completionLevel,
         status: args.status,
       },
+      userId,
       timestamp: now,
     });
 

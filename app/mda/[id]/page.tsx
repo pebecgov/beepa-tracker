@@ -6,12 +6,14 @@ import { Id } from "@/convex/_generated/dataModel";
 import { use, useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
+import { SignInButton } from "@clerk/nextjs";
 
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { formatScore, getStatus } from "@/lib/utils";
 import { ActivityStatus, Status } from "@/lib/types";
+import { useAppUser } from "@/components/UserProvider";
 
 interface MDAPageProps {
   params: Promise<{ id: string }>;
@@ -184,6 +186,7 @@ export default function MDAPage({ params }: MDAPageProps) {
 
 // Activities list component
 function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
+  const { isSignedIn, canEdit, isLoading: userLoading } = useAppUser();
   const activities = useQuery(api.activities.listByReform, { reformId });
   const updateCompletion = useMutation(api.activities.updateCompletion);
   const [editingActivity, setEditingActivity] = useState<Id<"activities"> | null>(null);
@@ -192,6 +195,11 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
     activityId: Id<"activities">,
     newStatus: ActivityStatus
   ) => {
+    if (!canEdit) {
+      toast.error("You don't have permission to update activities");
+      return;
+    }
+
     const completionLevel =
       newStatus === "complete" ? 1 : newStatus === "in_progress" ? 0.5 : 0;
 
@@ -211,6 +219,11 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
     activityId: Id<"activities">,
     completionLevel: number
   ) => {
+    if (!canEdit) {
+      toast.error("You don't have permission to update activities");
+      return;
+    }
+
     // Determine status based on completion level
     let status: ActivityStatus = "not_started";
     if (completionLevel >= 1) {
@@ -290,7 +303,7 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
 
               {/* Completion Level */}
               <div className="col-span-2">
-                {isEditing ? (
+                {isEditing && canEdit ? (
                   <CompletionEditor
                     initialValue={activity.completionLevel}
                     onSave={(value) => handleCompletionUpdate(activity._id, value)}
@@ -298,8 +311,9 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
                   />
                 ) : (
                   <button
-                    onClick={() => setEditingActivity(activity._id)}
-                    className="w-full flex items-center justify-center gap-2 group"
+                    onClick={() => canEdit && setEditingActivity(activity._id)}
+                    className={`w-full flex items-center justify-center gap-2 group ${!canEdit ? "cursor-default" : ""}`}
+                    disabled={!canEdit}
                   >
                     <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
@@ -312,48 +326,62 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
                         style={{ width: `${activity.completionLevel * 100}%` }}
                       />
                     </div>
-                    <span className="text-sm font-semibold text-gray-700 min-w-[45px] text-right group-hover:text-blue-600">
+                    <span className={`text-sm font-semibold text-gray-700 min-w-[45px] text-right ${canEdit ? "group-hover:text-[#006B3F]" : ""}`}>
                       {Math.round(activity.completionLevel * 100)}%
                     </span>
                   </button>
                 )}
               </div>
 
-              {/* Quick Status Buttons */}
+              {/* Quick Status Buttons or View-only Status */}
               <div className="col-span-4 flex items-center justify-center gap-1">
-                <button
-                  onClick={() => handleQuickStatus(activity._id, "not_started")}
-                  title="Set to 0%"
-                  className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-                    activity.status === "not_started"
-                      ? "bg-red-100 text-red-800 border-red-300 ring-1 ring-red-200"
-                      : "bg-white text-gray-500 border-gray-200 hover:border-red-300 hover:text-red-700"
-                  }`}
-                >
-                  Not Started
-                </button>
-                <button
-                  onClick={() => handleQuickStatus(activity._id, "in_progress")}
-                  title="Set to 50%"
-                  className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-                    activity.status === "in_progress"
-                      ? "bg-yellow-100 text-yellow-800 border-yellow-300 ring-1 ring-yellow-200"
-                      : "bg-white text-gray-500 border-gray-200 hover:border-yellow-300 hover:text-yellow-700"
-                  }`}
-                >
-                  In Progress
-                </button>
-                <button
-                  onClick={() => handleQuickStatus(activity._id, "complete")}
-                  title="Set to 100%"
-                  className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                {canEdit ? (
+                  <>
+                    <button
+                      onClick={() => handleQuickStatus(activity._id, "not_started")}
+                      title="Set to 0%"
+                      className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                        activity.status === "not_started"
+                          ? "bg-red-100 text-red-800 border-red-300 ring-1 ring-red-200"
+                          : "bg-white text-gray-500 border-gray-200 hover:border-red-300 hover:text-red-700"
+                      }`}
+                    >
+                      Not Started
+                    </button>
+                    <button
+                      onClick={() => handleQuickStatus(activity._id, "in_progress")}
+                      title="Set to 50%"
+                      className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                        activity.status === "in_progress"
+                          ? "bg-yellow-100 text-yellow-800 border-yellow-300 ring-1 ring-yellow-200"
+                          : "bg-white text-gray-500 border-gray-200 hover:border-yellow-300 hover:text-yellow-700"
+                      }`}
+                    >
+                      In Progress
+                    </button>
+                    <button
+                      onClick={() => handleQuickStatus(activity._id, "complete")}
+                      title="Set to 100%"
+                      className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                        activity.status === "complete"
+                          ? "bg-[#006B3F] text-white border-[#006B3F] ring-1 ring-[#006B3F]/30 shadow-sm"
+                          : "bg-white text-gray-500 border-gray-200 hover:border-[#006B3F] hover:text-[#006B3F]"
+                      }`}
+                    >
+                      Complete
+                    </button>
+                  </>
+                ) : (
+                  <span className={`px-3 py-1.5 text-xs font-medium rounded-lg ${
                     activity.status === "complete"
-                      ? "bg-[#006B3F] text-white border-[#006B3F] ring-1 ring-[#006B3F]/30 shadow-sm"
-                      : "bg-white text-gray-500 border-gray-200 hover:border-[#006B3F] hover:text-[#006B3F]"
-                  }`}
-                >
-                  Complete
-                </button>
+                      ? "bg-[#006B3F]/10 text-[#006B3F]"
+                      : activity.status === "in_progress"
+                      ? "bg-yellow-100 text-yellow-800"
+                      : "bg-red-100 text-red-800"
+                  }`}>
+                    {activity.status === "complete" ? "Complete" : activity.status === "in_progress" ? "In Progress" : "Not Started"}
+                  </span>
+                )}
               </div>
             </div>
           );
@@ -362,10 +390,24 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
 
       {/* Summary */}
       <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-sm">
-        <span className="text-gray-500">
-          {sortedActivities.filter((a) => a.status === "complete").length} of{" "}
-          {sortedActivities.length} activities complete
-        </span>
+        <div className="flex items-center gap-4">
+          <span className="text-gray-500">
+            {sortedActivities.filter((a) => a.status === "complete").length} of{" "}
+            {sortedActivities.length} activities complete
+          </span>
+          {!isSignedIn && (
+            <SignInButton mode="modal">
+              <button className="text-[#006B3F] hover:underline font-medium">
+                Sign in to edit
+              </button>
+            </SignInButton>
+          )}
+          {isSignedIn && !canEdit && (
+            <span className="text-orange-600 text-xs">
+              View only - contact admin for edit access
+            </span>
+          )}
+        </div>
         <span className="font-medium text-gray-700">
           Weighted Score:{" "}
           <span className="text-gray-900 font-bold">

@@ -261,6 +261,16 @@ export const getRankedMDAs = query({
   },
 });
 
+// Get progress history for timeline chart (placeholder - can be enhanced with snapshots)
+export const getProgressHistory = query({
+  args: {},
+  handler: async (ctx) => {
+    // This could be enhanced to store periodic snapshots
+    // For now, return null to indicate no historical data
+    return null;
+  },
+});
+
 // Get dashboard summary statistics
 export const getDashboardStats = query({
   args: {},
