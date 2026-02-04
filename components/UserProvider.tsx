@@ -45,9 +45,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // Link pending user on sign-in (if they were invited by email)
   useEffect(() => {
     const linkUser = async () => {
-      if (isLoaded && isSignedIn && dbUser !== undefined && !hasLinked.current) {
-        // If user exists but is pending, link them
-        if (dbUser && dbUser.status === "pending") {
+      if (isLoaded && isSignedIn && !hasLinked.current) {
+        // Try to link if:
+        // 1. User exists but is pending
+        // 2. User is not found (might be pending with email mismatch)
+        // 3. authCheck says user exists but getCurrentUser didn't find them
+        const shouldLink = 
+          (dbUser !== undefined && dbUser?.status === "pending") ||
+          (dbUser === null && authCheck !== undefined);
+        
+        if (shouldLink) {
           hasLinked.current = true;
           try {
             await linkPendingUser();
@@ -58,7 +65,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
     };
     linkUser();
-  }, [isLoaded, isSignedIn, dbUser, linkPendingUser]);
+  }, [isLoaded, isSignedIn, dbUser, authCheck, linkPendingUser]);
 
   // Handle bootstrap for first admin
   useEffect(() => {

@@ -24,8 +24,8 @@ export const getCurrentUser = query({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
 
-    // If not found by Clerk ID, try by email (for pending invites)
-    const email = identity.email;
+    // If not found by Clerk ID, try by email (for pending invites) - use lowercase
+    const email = identity.email?.toLowerCase();
     if (!user && email) {
       user = await ctx.db
         .query("users")
@@ -51,13 +51,16 @@ export const linkPendingUser = mutation({
       .first();
 
     if (existingByClerkId) {
-      // Update last login
-      await ctx.db.patch(existingByClerkId._id, { lastLoginAt: Date.now() });
+      // Update last login and ensure status is active
+      await ctx.db.patch(existingByClerkId._id, { 
+        lastLoginAt: Date.now(),
+        status: existingByClerkId.status === "pending" ? "active" : existingByClerkId.status,
+      });
       return existingByClerkId;
     }
 
-    // Try to find by email (for pending invites)
-    const email = identity.email;
+    // Try to find by email (for pending invites) - use lowercase for matching
+    const email = identity.email?.toLowerCase();
     if (!email) return null;
 
     const userByEmail = await ctx.db
@@ -65,8 +68,8 @@ export const linkPendingUser = mutation({
       .withIndex("by_email", (q) => q.eq("email", email))
       .first();
 
-    // If found by email and pending, link the Clerk ID and activate
-    if (userByEmail && userByEmail.status === "pending") {
+    // If found by email, link the Clerk ID and activate
+    if (userByEmail) {
       await ctx.db.patch(userByEmail._id, {
         clerkId: identity.subject,
         status: "active",
@@ -77,7 +80,7 @@ export const linkPendingUser = mutation({
       return await ctx.db.get(userByEmail._id);
     }
 
-    return userByEmail;
+    return null;
   },
 });
 
@@ -94,8 +97,8 @@ export const isAuthorized = query({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
 
-    // Then by email for pending invites
-    const email = identity.email;
+    // Then by email for pending invites - use lowercase
+    const email = identity.email?.toLowerCase();
     if (!user && email) {
       user = await ctx.db
         .query("users")
