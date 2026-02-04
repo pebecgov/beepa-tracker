@@ -127,7 +127,7 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleToggleStatus = async (userId: Id<"users">, currentStatus: string) => {
+  const handleToggleStatus = async (userId: Id<"users">, currentStatus: string | undefined) => {
     const newStatus = currentStatus === "active" ? "inactive" : "active";
     try {
       await updateUser({ id: userId, status: newStatus as "active" | "inactive" });
