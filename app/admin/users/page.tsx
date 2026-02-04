@@ -15,16 +15,16 @@ export default function AdminUsersPage() {
   const { isAdmin, isLoading: userLoading } = useAppUser();
   const users = useQuery(api.users.list);
   const mdas = useQuery(api.mdas.list);
-  const createUser = useMutation(api.users.create);
+  const inviteUser = useMutation(api.users.invite);
   const updateUser = useMutation(api.users.update);
   const removeUser = useMutation(api.users.remove);
+  const getInviteEmail = useMutation(api.users.getInviteEmail);
 
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingUser, setEditingUser] = useState<Id<"users"> | null>(null);
+  const [isInviting, setIsInviting] = useState(false);
 
   // Form state for adding new user
   const [newUser, setNewUser] = useState({
-    clerkId: "",
     email: "",
     name: "",
     role: "viewer" as Role,
@@ -54,26 +54,67 @@ export default function AdminUsersPage() {
     );
   }
 
-  const handleAddUser = async (e: React.FormEvent) => {
+  const handleInviteUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUser.clerkId || !newUser.email) {
-      toast.error("Clerk ID and email are required");
+    if (!newUser.email) {
+      toast.error("Email is required");
       return;
     }
 
+    setIsInviting(true);
     try {
-      await createUser({
-        clerkId: newUser.clerkId,
+      // Step 1: Create user record in Convex (pending status)
+      const result = await inviteUser({
         email: newUser.email,
         name: newUser.name || undefined,
         role: newUser.role,
         assignedMDAs: newUser.assignedMDAs.length > 0 ? newUser.assignedMDAs : undefined,
       });
-      toast.success("User created successfully!");
+
+      // Step 2: Send Clerk invitation email
+      const response = await fetch("/api/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: result.email }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        // User created in DB but invitation failed - still success, can resend
+        toast.warning(`User added but invitation email failed: ${data.error}. You can resend the invitation.`);
+      } else {
+        toast.success(`Invitation sent to ${result.email}!`);
+      }
+
       setShowAddForm(false);
-      setNewUser({ clerkId: "", email: "", name: "", role: "viewer", assignedMDAs: [] });
+      setNewUser({ email: "", name: "", role: "viewer", assignedMDAs: [] });
     } catch (error: any) {
-      toast.error(error.message || "Failed to create user");
+      toast.error(error.message || "Failed to invite user");
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
+  const handleResendInvite = async (userId: Id<"users">) => {
+    try {
+      const { email } = await getInviteEmail({ id: userId });
+      
+      const response = await fetch("/api/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        toast.error(data.error || "Failed to send invitation");
+      } else {
+        toast.success(`Invitation resent to ${email}`);
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to resend invitation");
     }
   };
 
@@ -86,10 +127,11 @@ export default function AdminUsersPage() {
     }
   };
 
-  const handleToggleActive = async (userId: Id<"users">, isActive: boolean) => {
+  const handleToggleStatus = async (userId: Id<"users">, currentStatus: string) => {
+    const newStatus = currentStatus === "active" ? "inactive" : "active";
     try {
-      await updateUser({ id: userId, isActive });
-      toast.success(isActive ? "User activated" : "User deactivated");
+      await updateUser({ id: userId, status: newStatus as "active" | "inactive" });
+      toast.success(newStatus === "active" ? "User activated" : "User deactivated");
     } catch (error: any) {
       toast.error(error.message || "Failed to update user");
     }
@@ -130,25 +172,15 @@ export default function AdminUsersPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Add User Form */}
+        {/* Invite User Form */}
         {showAddForm && (
           <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-md">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Add New User</h2>
-            <form onSubmit={handleAddUser} className="space-y-4">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">Invite New User</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              The user will receive an email invitation to join the system.
+            </p>
+            <form onSubmit={handleInviteUser} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Clerk User ID <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={newUser.clerkId}
-                    onChange={(e) => setNewUser({ ...newUser, clerkId: e.target.value })}
-                    placeholder="user_xxx (from Clerk dashboard)"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#006B3F] focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Find this in Clerk Dashboard → Users</p>
-                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Email <span className="text-red-500">*</span>
@@ -162,7 +194,7 @@ export default function AdminUsersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Name (optional)</label>
                   <input
                     type="text"
                     value={newUser.name}
@@ -171,7 +203,7 @@ export default function AdminUsersPage() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#006B3F] focus:border-transparent"
                   />
                 </div>
-                <div>
+                <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
                   <select
                     value={newUser.role}
@@ -189,14 +221,23 @@ export default function AdminUsersPage() {
                   type="button"
                   onClick={() => setShowAddForm(false)}
                   className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+                  disabled={isInviting}
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-[#006B3F] text-white font-medium rounded-lg hover:bg-[#005432] transition-colors"
+                  disabled={isInviting}
+                  className="px-4 py-2 bg-[#006B3F] text-white font-medium rounded-lg hover:bg-[#005432] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  Add User
+                  {isInviting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    "Send Invitation"
+                  )}
                 </button>
               </div>
             </form>
@@ -214,7 +255,7 @@ export default function AdminUsersPage() {
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">User</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Role</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Created</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase">Invited</th>
                   <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
                 </tr>
               </thead>
@@ -225,7 +266,11 @@ export default function AdminUsersPage() {
                       <div>
                         <div className="font-medium text-gray-900">{user.name || "No name"}</div>
                         <div className="text-sm text-gray-500">{user.email}</div>
-                        <div className="text-xs text-gray-400 font-mono">{user.clerkId}</div>
+                        {user.lastLoginAt && (
+                          <div className="text-xs text-gray-400">
+                            Last login: {new Date(user.lastLoginAt).toLocaleDateString()}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -246,21 +291,38 @@ export default function AdminUsersPage() {
                       </select>
                     </td>
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() => handleToggleActive(user._id, !user.isActive)}
-                        className={`px-3 py-1 text-xs font-medium rounded-full ${
-                          user.isActive
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {user.isActive ? "Active" : "Inactive"}
-                      </button>
+                      {user.status === "pending" ? (
+                        <span className="px-3 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                          Pending
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleToggleStatus(user._id, user.status)}
+                          className={`px-3 py-1 text-xs font-medium rounded-full ${
+                            user.status === "active"
+                              ? "bg-green-100 text-green-800 hover:bg-green-200"
+                              : "bg-red-100 text-red-800 hover:bg-red-200"
+                          }`}
+                        >
+                          {user.status === "active" ? "Active" : "Inactive"}
+                        </button>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-500">
-                      {new Date(user.createdAt).toLocaleDateString()}
+                      {user.invitedAt 
+                        ? new Date(user.invitedAt).toLocaleDateString()
+                        : new Date(user.createdAt).toLocaleDateString()
+                      }
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right space-x-2">
+                      {user.status === "pending" && (
+                        <button
+                          onClick={() => handleResendInvite(user._id)}
+                          className="text-[#006B3F] hover:text-[#005432] text-sm font-medium"
+                        >
+                          Resend Invite
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDeleteUser(user._id)}
                         className="text-red-600 hover:text-red-800 text-sm font-medium"
@@ -273,7 +335,7 @@ export default function AdminUsersPage() {
                 {(!users || users.length === 0) && (
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                      No users found. Add your first user above.
+                      No users found. Invite your first user above.
                     </td>
                   </tr>
                 )}

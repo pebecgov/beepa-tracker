@@ -11,7 +11,7 @@ async function canUserEdit(ctx: any, mdaId?: any): Promise<{ canEdit: boolean; u
     .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
     .first();
 
-  if (!user || !user.isActive) return { canEdit: false };
+  if (!user || user.status !== "active") return { canEdit: false };
 
   // Admins can edit everything
   if (user.role === "admin") return { canEdit: true, userId: identity.subject };

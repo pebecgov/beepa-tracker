@@ -6,7 +6,6 @@ import { Id } from "@/convex/_generated/dataModel";
 import { use, useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { SignInButton } from "@clerk/nextjs";
 
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -395,16 +394,9 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
             {sortedActivities.filter((a) => a.status === "complete").length} of{" "}
             {sortedActivities.length} activities complete
           </span>
-          {!isSignedIn && (
-            <SignInButton mode="modal">
-              <button className="text-[#006B3F] hover:underline font-medium">
-                Sign in to edit
-              </button>
-            </SignInButton>
-          )}
-          {isSignedIn && !canEdit && (
-            <span className="text-orange-600 text-xs">
-              View only - contact admin for edit access
+          {!canEdit && (
+            <span className="text-gray-400 text-xs">
+              View only
             </span>
           )}
         </div>

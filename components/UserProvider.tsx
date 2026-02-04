@@ -1,13 +1,15 @@
 "use client";
 
-import { createContext, useContext, useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
+import { createContext, useContext, useEffect, useState } from "react";
+import { useUser, useClerk } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
 interface UserContextType {
   isLoading: boolean;
   isSignedIn: boolean;
+  isAuthorized: boolean;
+  authError: string | null;
   user: any;
   role: "admin" | "editor" | "viewer" | null;
   canEdit: boolean;
@@ -17,6 +19,8 @@ interface UserContextType {
 const UserContext = createContext<UserContextType>({
   isLoading: true,
   isSignedIn: false,
+  isAuthorized: false,
+  authError: null,
   user: null,
   role: null,
   canEdit: false,
@@ -29,35 +33,60 @@ export function useAppUser() {
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn, user: clerkUser } = useUser();
+  const { signOut } = useClerk();
+  const authCheck = useQuery(api.users.isAuthorized);
   const dbUser = useQuery(api.users.getCurrentUser);
-  const registerUser = useMutation(api.users.registerCurrentUser);
+  const bootstrapAdmin = useMutation(api.users.bootstrapAdmin);
+  const [isBootstrapping, setIsBootstrapping] = useState(false);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
 
-  // Register user on first sign-in
+  // Determine loading state
+  const isLoading = !isLoaded || (isSignedIn && (authCheck === undefined || dbUser === undefined));
+
+  // Determine authorization
+  const isAuthorized = authCheck?.authorized || false;
+  const authError = authCheck?.reason || null;
+
+  // User data
+  const user = dbUser;
+  const role = user?.role || null;
+  const canEdit = (role === "admin" || role === "editor") && user?.status === "active";
+  const isAdmin = role === "admin" && user?.status === "active";
+
+  // Handle bootstrap for first admin
   useEffect(() => {
-    const register = async () => {
-      if (isLoaded && isSignedIn && dbUser === null) {
+    const handleBootstrap = async () => {
+      if (
+        isLoaded && 
+        isSignedIn && 
+        authCheck?.reason === "not_invited" && 
+        !isBootstrapping &&
+        !bootstrapError
+      ) {
+        // Check if this could be the first user by trying to bootstrap
+        setIsBootstrapping(true);
         try {
-          await registerUser();
-        } catch (error) {
-          // User might already exist or other error
-          console.error("Error registering user:", error);
+          await bootstrapAdmin();
+          // Refresh will happen automatically via Convex reactivity
+        } catch (error: any) {
+          // If bootstrap fails, it means there are existing users
+          setBootstrapError(error.message);
+        } finally {
+          setIsBootstrapping(false);
         }
       }
     };
-    register();
-  }, [isLoaded, isSignedIn, dbUser, registerUser]);
-
-  const isLoading = !isLoaded || (isSignedIn && dbUser === undefined);
-  const role = dbUser?.role || null;
-  const canEdit = role === "admin" || role === "editor";
-  const isAdmin = role === "admin";
+    handleBootstrap();
+  }, [isLoaded, isSignedIn, authCheck, bootstrapAdmin, isBootstrapping, bootstrapError]);
 
   return (
     <UserContext.Provider
       value={{
-        isLoading,
+        isLoading: isLoading || isBootstrapping,
         isSignedIn: !!isSignedIn,
-        user: dbUser,
+        isAuthorized,
+        authError: bootstrapError || authError,
+        user,
         role,
         canEdit,
         isAdmin,

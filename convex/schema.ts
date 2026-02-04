@@ -2,9 +2,9 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
-  // Users with roles for access control
+  // Users with roles for access control (invite-only)
   users: defineTable({
-    clerkId: v.string(),
+    clerkId: v.optional(v.string()), // Optional until user accepts invite
     email: v.string(),
     name: v.optional(v.string()),
     role: v.union(
@@ -12,15 +12,22 @@ export default defineSchema({
       v.literal("editor"),     // Can update activity statuses
       v.literal("viewer")      // Read-only access
     ),
+    status: v.union(
+      v.literal("pending"),    // Invited but hasn't signed in yet
+      v.literal("active"),     // Has signed in and is active
+      v.literal("inactive")    // Deactivated by admin
+    ),
     // Optional: Restrict editor to specific MDAs
     assignedMDAs: v.optional(v.array(v.id("mdas"))),
-    isActive: v.boolean(),
+    invitedAt: v.optional(v.number()),
+    lastLoginAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_clerk_id", ["clerkId"])
     .index("by_email", ["email"])
-    .index("by_role", ["role"]),
+    .index("by_role", ["role"])
+    .index("by_status", ["status"]),
 
   // MDAs (Ministries/Departments/Agencies)
   mdas: defineTable({
