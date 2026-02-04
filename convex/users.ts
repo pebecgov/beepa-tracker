@@ -166,10 +166,18 @@ export const list = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) return [];
 
-    const currentUser = await ctx.db
+    // Try to find by Clerk ID first, then by email
+    let currentUser = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
+    
+    if (!currentUser && identity.email) {
+      currentUser = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email.toLowerCase()))
+        .first();
+    }
 
     if (!currentUser || currentUser.role !== "admin") return [];
 
@@ -189,10 +197,27 @@ export const invite = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 
-    const currentUser = await ctx.db
+    // Try to find current user by Clerk ID first, then by email
+    let currentUser = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
+    
+    // Fallback: find by email if not found by clerkId
+    if (!currentUser && identity.email) {
+      currentUser = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email.toLowerCase()))
+        .first();
+      
+      // If found by email, link the clerkId
+      if (currentUser && !currentUser.clerkId) {
+        await ctx.db.patch(currentUser._id, { 
+          clerkId: identity.subject,
+          updatedAt: Date.now()
+        });
+      }
+    }
 
     // Allow first user creation (bootstrap admin) or admin inviting users
     const isFirstUser = (await ctx.db.query("users").first()) === null;
@@ -275,10 +300,18 @@ export const update = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 
-    const currentUser = await ctx.db
+    // Try to find by Clerk ID first, then by email
+    let currentUser = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
+    
+    if (!currentUser && identity.email) {
+      currentUser = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email.toLowerCase()))
+        .first();
+    }
 
     if (!currentUser || currentUser.role !== "admin") {
       throw new Error("Only admins can update users");
@@ -305,10 +338,18 @@ export const remove = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 
-    const currentUser = await ctx.db
+    // Try to find by Clerk ID first, then by email
+    let currentUser = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
+    
+    if (!currentUser && identity.email) {
+      currentUser = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email.toLowerCase()))
+        .first();
+    }
 
     if (!currentUser || currentUser.role !== "admin") {
       throw new Error("Only admins can delete users");
@@ -332,10 +373,18 @@ export const getInviteEmail = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 
-    const currentUser = await ctx.db
+    // Try to find by Clerk ID first, then by email
+    let currentUser = await ctx.db
       .query("users")
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
+    
+    if (!currentUser && identity.email) {
+      currentUser = await ctx.db
+        .query("users")
+        .withIndex("by_email", (q) => q.eq("email", identity.email.toLowerCase()))
+        .first();
+    }
 
     if (!currentUser || currentUser.role !== "admin") {
       throw new Error("Only admins can resend invitations");
