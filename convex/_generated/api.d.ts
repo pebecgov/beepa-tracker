@@ -8,13 +8,27 @@
  * @module
  */
 
+import type * as activities from "../activities.js";
+import type * as beepaFramework from "../beepaFramework.js";
+import type * as mdas from "../mdas.js";
+import type * as performance from "../performance.js";
+import type * as reforms from "../reforms.js";
+import type * as seed from "../seed.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
-declare const fullApi: ApiFromModules<{}>;
+declare const fullApi: ApiFromModules<{
+  activities: typeof activities;
+  beepaFramework: typeof beepaFramework;
+  mdas: typeof mdas;
+  performance: typeof performance;
+  reforms: typeof reforms;
+  seed: typeof seed;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.
