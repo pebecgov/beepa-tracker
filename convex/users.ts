@@ -2,6 +2,15 @@ import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
 
+// Check if system has any users (for initial setup)
+export const hasAnyUsers = query({
+  args: {},
+  handler: async (ctx) => {
+    const firstUser = await ctx.db.query("users").first();
+    return firstUser !== null;
+  },
+});
+
 // Get the current user's role and info (only if they're in our system)
 export const getCurrentUser = query({
   args: {},
@@ -16,31 +25,59 @@ export const getCurrentUser = query({
       .first();
 
     // If not found by Clerk ID, try by email (for pending invites)
-    if (!user && identity.email) {
+    const email = identity.email;
+    if (!user && email) {
       user = await ctx.db
         .query("users")
-        .withIndex("by_email", (q) => q.eq("email", identity.email))
+        .withIndex("by_email", (q) => q.eq("email", email))
         .first();
-
-      // If found by email (pending invite), link the Clerk ID and activate
-      if (user && user.status === "pending") {
-        await ctx.db.patch(user._id, {
-          clerkId: identity.subject,
-          status: "active",
-          name: identity.name || user.name,
-          lastLoginAt: Date.now(),
-          updatedAt: Date.now(),
-        });
-        user = await ctx.db.get(user._id);
-      }
-    }
-
-    // Update last login if active
-    if (user && user.status === "active" && user.clerkId) {
-      await ctx.db.patch(user._id, { lastLoginAt: Date.now() });
     }
 
     return user;
+  },
+});
+
+// Link pending user to Clerk ID on first sign-in (mutation for write access)
+export const linkPendingUser = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    // Check if already linked by Clerk ID
+    const existingByClerkId = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+
+    if (existingByClerkId) {
+      // Update last login
+      await ctx.db.patch(existingByClerkId._id, { lastLoginAt: Date.now() });
+      return existingByClerkId;
+    }
+
+    // Try to find by email (for pending invites)
+    const email = identity.email;
+    if (!email) return null;
+
+    const userByEmail = await ctx.db
+      .query("users")
+      .withIndex("by_email", (q) => q.eq("email", email))
+      .first();
+
+    // If found by email and pending, link the Clerk ID and activate
+    if (userByEmail && userByEmail.status === "pending") {
+      await ctx.db.patch(userByEmail._id, {
+        clerkId: identity.subject,
+        status: "active",
+        name: identity.name || userByEmail.name,
+        lastLoginAt: Date.now(),
+        updatedAt: Date.now(),
+      });
+      return await ctx.db.get(userByEmail._id);
+    }
+
+    return userByEmail;
   },
 });
 
@@ -58,10 +95,11 @@ export const isAuthorized = query({
       .first();
 
     // Then by email for pending invites
-    if (!user && identity.email) {
+    const email = identity.email;
+    if (!user && email) {
       user = await ctx.db
         .query("users")
-        .withIndex("by_email", (q) => q.eq("email", identity.email))
+        .withIndex("by_email", (q) => q.eq("email", email))
         .first();
     }
 
@@ -198,7 +236,9 @@ export const bootstrapAdmin = mutation({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
-    if (!identity.email) throw new Error("Email required");
+    
+    const email = identity.email;
+    if (!email) throw new Error("Email required");
 
     // Check if any users exist
     const existingUsers = await ctx.db.query("users").first();
@@ -209,7 +249,7 @@ export const bootstrapAdmin = mutation({
     const now = Date.now();
     const id = await ctx.db.insert("users", {
       clerkId: identity.subject,
-      email: identity.email.toLowerCase(),
+      email: email.toLowerCase(),
       name: identity.name,
       role: "admin",
       status: "active",

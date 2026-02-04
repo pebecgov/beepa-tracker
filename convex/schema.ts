@@ -12,11 +12,11 @@ export default defineSchema({
       v.literal("editor"),     // Can update activity statuses
       v.literal("viewer")      // Read-only access
     ),
-    status: v.union(
+    status: v.optional(v.union(
       v.literal("pending"),    // Invited but hasn't signed in yet
       v.literal("active"),     // Has signed in and is active
       v.literal("inactive")    // Deactivated by admin
-    ),
+    )),
     // Optional: Restrict editor to specific MDAs
     assignedMDAs: v.optional(v.array(v.id("mdas"))),
     invitedAt: v.optional(v.number()),

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { useUser, useClerk } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
@@ -32,26 +32,33 @@ export function useAppUser() {
 }
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const { isLoaded, isSignedIn, user: clerkUser } = useUser();
-  const { signOut } = useClerk();
+  const { isLoaded, isSignedIn } = useUser();
   const authCheck = useQuery(api.users.isAuthorized);
   const dbUser = useQuery(api.users.getCurrentUser);
   const bootstrapAdmin = useMutation(api.users.bootstrapAdmin);
+  const linkPendingUser = useMutation(api.users.linkPendingUser);
+  
   const [isBootstrapping, setIsBootstrapping] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const hasLinked = useRef(false);
 
-  // Determine loading state
-  const isLoading = !isLoaded || (isSignedIn && (authCheck === undefined || dbUser === undefined));
-
-  // Determine authorization
-  const isAuthorized = authCheck?.authorized || false;
-  const authError = authCheck?.reason || null;
-
-  // User data
-  const user = dbUser;
-  const role = user?.role || null;
-  const canEdit = (role === "admin" || role === "editor") && user?.status === "active";
-  const isAdmin = role === "admin" && user?.status === "active";
+  // Link pending user on sign-in (if they were invited by email)
+  useEffect(() => {
+    const linkUser = async () => {
+      if (isLoaded && isSignedIn && dbUser !== undefined && !hasLinked.current) {
+        // If user exists but is pending, link them
+        if (dbUser && dbUser.status === "pending") {
+          hasLinked.current = true;
+          try {
+            await linkPendingUser();
+          } catch (error) {
+            console.error("Error linking user:", error);
+          }
+        }
+      }
+    };
+    linkUser();
+  }, [isLoaded, isSignedIn, dbUser, linkPendingUser]);
 
   // Handle bootstrap for first admin
   useEffect(() => {
@@ -78,6 +85,19 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     };
     handleBootstrap();
   }, [isLoaded, isSignedIn, authCheck, bootstrapAdmin, isBootstrapping, bootstrapError]);
+
+  // Determine loading state
+  const isLoading = !isLoaded || (isSignedIn && (authCheck === undefined || dbUser === undefined));
+
+  // Determine authorization
+  const isAuthorized = authCheck?.authorized || false;
+  const authError = authCheck?.reason || null;
+
+  // User data
+  const user = dbUser;
+  const role = user?.role || null;
+  const canEdit = (role === "admin" || role === "editor") && user?.status === "active";
+  const isAdmin = role === "admin" && user?.status === "active";
 
   return (
     <UserContext.Provider

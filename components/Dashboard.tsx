@@ -5,7 +5,7 @@ import { api } from "@/convex/_generated/api";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { UserButton, useClerk } from "@clerk/nextjs";
+import { UserButton, useClerk, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { useAppUser } from "./UserProvider";
 
@@ -31,6 +31,7 @@ export function Dashboard() {
 
   const stats = useQuery(api.performance.getDashboardStats);
   const rankings = useQuery(api.performance.getRankedMDAs);
+  const hasAnyUsers = useQuery(api.users.hasAnyUsers);
 
   // Filter rankings by search query
   const filteredRankings = rankings?.filter((item) => {
@@ -95,6 +96,30 @@ export function Dashboard() {
   const handleMDAClick = (mda: MDAPerformance) => {
     router.push(`/mda/${mda.mda._id}`);
   };
+
+  // Show setup screen when no users exist (first-time setup)
+  if (hasAnyUsers === false && !isSignedIn) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
+          <img 
+            src="/pebec-logo.png" 
+            alt="PEBEC Logo" 
+            className="h-20 w-auto mx-auto mb-6"
+          />
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome to BEEPA Tracker</h1>
+          <p className="text-gray-500 mb-6">
+            Set up your admin account to get started. You'll be the first administrator.
+          </p>
+          <SignInButton mode="modal">
+            <button className="w-full px-4 py-3 text-white bg-[#006B3F] font-medium rounded-lg hover:bg-[#005432] transition-colors shadow-md">
+              Create Admin Account
+            </button>
+          </SignInButton>
+        </div>
+      </div>
+    );
+  }
 
   // Show access denied for signed-in but unauthorized users
   if (isSignedIn && !isAuthorized && !userLoading) {
