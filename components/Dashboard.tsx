@@ -191,7 +191,7 @@ export function Dashboard() {
                   </button>
                 </>
               )}
-              {isSignedIn ? (
+              {isSignedIn && isAuthorized && (
                 <div className="flex items-center gap-2">
                   {role && (
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -204,12 +204,6 @@ export function Dashboard() {
                   )}
                   <UserButton afterSignOutUrl="/" />
                 </div>
-              ) : (
-                <SignInButton mode="modal">
-                  <button className="px-4 py-2 text-sm font-medium text-[#006B3F] bg-white rounded-lg hover:bg-green-50 transition-colors shadow-md">
-                    Sign In
-                  </button>
-                </SignInButton>
               )}
             </div>
           </div>
