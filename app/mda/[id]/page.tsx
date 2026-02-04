@@ -11,7 +11,7 @@ import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { formatScore, getStatus } from "@/lib/utils";
-import { ActivityStatus } from "@/lib/types";
+import { ActivityStatus, Status } from "@/lib/types";
 
 interface MDAPageProps {
   params: Promise<{ id: string }>;
@@ -79,7 +79,7 @@ export default function MDAPage({ params }: MDAPageProps) {
                 <p className="text-gray-500 mt-2">{mda.description}</p>
               )}
             </div>
-            <StatusBadge status={status} size="lg" />
+            <StatusBadge status={status as Status} size="lg" />
           </div>
 
           <div className="mt-6 bg-gradient-to-r from-gray-50 to-white rounded-xl p-4 border border-gray-200">
@@ -87,7 +87,7 @@ export default function MDAPage({ params }: MDAPageProps) {
               <span className="text-sm font-medium text-gray-700">Overall BEEPA Score</span>
               <span className="text-2xl font-bold text-[#006B3F]">{formatScore(score)}</span>
             </div>
-            <ProgressBar score={score} color={status.color} showLabel={false} size="lg" />
+            <ProgressBar score={score} color={(status as Status).color} showLabel={false} size="lg" />
           </div>
         </div>
       </header>
@@ -143,14 +143,14 @@ export default function MDAPage({ params }: MDAPageProps) {
                           </div>
                         </div>
                       </div>
-                      <StatusBadge status={reformPerf.status!} size="sm" />
+                      <StatusBadge status={reformPerf.status as Status} size="sm" />
                     </div>
 
                     <div className="flex items-center gap-4 ml-9">
                       <div className="flex-1 max-w-md">
                         <ProgressBar
                           score={reformPerf.score}
-                          color={reformPerf.status!.color}
+                          color={(reformPerf.status as Status).color}
                           showLabel={false}
                           size="sm"
                         />

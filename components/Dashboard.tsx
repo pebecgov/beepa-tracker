@@ -12,7 +12,7 @@ import { StatusDistribution } from "./StatusDistribution";
 import { MDACard } from "./MDACard";
 import { StatCardSkeleton, CardSkeleton, TableSkeleton } from "./ui/Skeleton";
 import { formatScore } from "@/lib/utils";
-import { MDAPerformance } from "@/lib/types";
+import { MDAPerformance, DashboardStats } from "@/lib/types";
 
 type ViewMode = "ranking" | "grid";
 
@@ -188,7 +188,7 @@ export function Dashboard() {
         {/* Status Distribution */}
         {stats && stats.totalMDAs > 0 && (
           <section className="mb-8">
-            <StatusDistribution stats={stats} />
+            <StatusDistribution stats={stats as DashboardStats} />
           </section>
         )}
 
@@ -267,15 +267,15 @@ export function Dashboard() {
           {filteredRankings ? (
             filteredRankings.length > 0 ? (
               viewMode === "ranking" ? (
-                <RankingTable rankings={filteredRankings} onRowClick={handleMDAClick} />
+                <RankingTable rankings={filteredRankings as MDAPerformance[]} onRowClick={handleMDAClick} />
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredRankings.map((mda) => (
                     <MDACard
                       key={mda.mda._id}
-                      performance={mda}
+                      performance={mda as MDAPerformance}
                       showRank
-                      onClick={() => handleMDAClick(mda)}
+                      onClick={() => handleMDAClick(mda as MDAPerformance)}
                     />
                   ))}
                 </div>
