@@ -14,6 +14,7 @@ import type * as mdas from "../mdas.js";
 import type * as performance from "../performance.js";
 import type * as reforms from "../reforms.js";
 import type * as seed from "../seed.js";
+import type * as users from "../users.js";
 
 import type {
   ApiFromModules,
@@ -28,6 +29,7 @@ declare const fullApi: ApiFromModules<{
   performance: typeof performance;
   reforms: typeof reforms;
   seed: typeof seed;
+  users: typeof users;
 }>;
 
 /**
