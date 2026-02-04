@@ -172,10 +172,11 @@ export const list = query({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
     
-    if (!currentUser && identity.email) {
+    const identityEmail = identity.email;
+    if (!currentUser && identityEmail) {
       currentUser = await ctx.db
         .query("users")
-        .withIndex("by_email", (q) => q.eq("email", identity.email.toLowerCase()))
+        .withIndex("by_email", (q) => q.eq("email", identityEmail.toLowerCase()))
         .first();
     }
 
@@ -204,10 +205,11 @@ export const invite = mutation({
       .first();
     
     // Fallback: find by email if not found by clerkId
-    if (!currentUser && identity.email) {
+    const inviteIdentityEmail = identity.email;
+    if (!currentUser && inviteIdentityEmail) {
       currentUser = await ctx.db
         .query("users")
-        .withIndex("by_email", (q) => q.eq("email", identity.email.toLowerCase()))
+        .withIndex("by_email", (q) => q.eq("email", inviteIdentityEmail.toLowerCase()))
         .first();
       
       // If found by email, link the clerkId
@@ -306,10 +308,11 @@ export const update = mutation({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
     
-    if (!currentUser && identity.email) {
+    const updateIdentityEmail = identity.email;
+    if (!currentUser && updateIdentityEmail) {
       currentUser = await ctx.db
         .query("users")
-        .withIndex("by_email", (q) => q.eq("email", identity.email.toLowerCase()))
+        .withIndex("by_email", (q) => q.eq("email", updateIdentityEmail.toLowerCase()))
         .first();
     }
 
@@ -344,10 +347,11 @@ export const remove = mutation({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
     
-    if (!currentUser && identity.email) {
+    const removeIdentityEmail = identity.email;
+    if (!currentUser && removeIdentityEmail) {
       currentUser = await ctx.db
         .query("users")
-        .withIndex("by_email", (q) => q.eq("email", identity.email.toLowerCase()))
+        .withIndex("by_email", (q) => q.eq("email", removeIdentityEmail.toLowerCase()))
         .first();
     }
 
@@ -379,10 +383,11 @@ export const getInviteEmail = mutation({
       .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
       .first();
     
-    if (!currentUser && identity.email) {
+    const resendIdentityEmail = identity.email;
+    if (!currentUser && resendIdentityEmail) {
       currentUser = await ctx.db
         .query("users")
-        .withIndex("by_email", (q) => q.eq("email", identity.email.toLowerCase()))
+        .withIndex("by_email", (q) => q.eq("email", resendIdentityEmail.toLowerCase()))
         .first();
     }
 
