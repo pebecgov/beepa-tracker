@@ -5,9 +5,10 @@ import { api } from "@/convex/_generated/api";
 import { useState, useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-import { UserButton, useClerk, SignInButton } from "@clerk/nextjs";
+import { UserButton, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
 import { useAppUser } from "./UserProvider";
+import { RoleSelection } from "./RoleSelection";
 
 import { StatCard } from "./ui/StatCard";
 import { RankingTable } from "./RankingTable";
@@ -22,8 +23,7 @@ type ViewMode = "ranking" | "grid";
 
 export function Dashboard() {
   const router = useRouter();
-  const { signOut } = useClerk();
-  const { isSignedIn, isAuthorized, isAdmin, role, isLoading: userLoading, authError } = useAppUser();
+  const { isSignedIn, isAdmin, role, isLoading: userLoading, needsRoleSelection } = useAppUser();
   const [viewMode, setViewMode] = useState<ViewMode>("ranking");
   const [searchQuery, setSearchQuery] = useState("");
   const [isInitializing, setIsInitializing] = useState(false);
@@ -31,7 +31,6 @@ export function Dashboard() {
 
   const stats = useQuery(api.performance.getDashboardStats);
   const rankings = useQuery(api.performance.getRankedMDAs);
-  const hasAnyUsers = useQuery(api.users.hasAnyUsers);
 
   // Filter rankings by search query
   const filteredRankings = rankings?.filter((item) => {
@@ -97,58 +96,9 @@ export function Dashboard() {
     router.push(`/mda/${mda.mda._id}`);
   };
 
-  // Show setup screen when no users exist (first-time setup)
-  if (hasAnyUsers === false && !isSignedIn) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
-          <img 
-            src="/pebec-logo.png" 
-            alt="PEBEC Logo" 
-            className="h-20 w-auto mx-auto mb-6"
-          />
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome to BEEPA Tracker</h1>
-          <p className="text-gray-500 mb-6">
-            Set up your admin account to get started. You'll be the first administrator.
-          </p>
-          <SignInButton mode="modal">
-            <button className="w-full px-4 py-3 text-white bg-[#006B3F] font-medium rounded-lg hover:bg-[#005432] transition-colors shadow-md">
-              Create Admin Account
-            </button>
-          </SignInButton>
-        </div>
-      </div>
-    );
-  }
-
-  // Show access denied for signed-in but unauthorized users
-  if (isSignedIn && !isAuthorized && !userLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <h1 className="text-xl font-bold text-gray-900 mb-2">Access Denied</h1>
-          <p className="text-gray-500 mb-6">
-            {authError === "not_invited" 
-              ? "You haven't been invited to this system. Please contact an administrator to request access."
-              : authError === "deactivated"
-              ? "Your account has been deactivated. Please contact an administrator."
-              : "You don't have permission to access this system."
-            }
-          </p>
-          <button
-            onClick={() => signOut({ redirectUrl: "/" })}
-            className="px-4 py-2 text-sm font-medium text-white bg-[#006B3F] rounded-lg hover:bg-[#005432] transition-colors"
-          >
-            Sign Out
-          </button>
-        </div>
-      </div>
-    );
+  // Show role selection for new users
+  if (isSignedIn && needsRoleSelection && !userLoading) {
+    return <RoleSelection />;
   }
 
   return (
@@ -191,7 +141,7 @@ export function Dashboard() {
                   </button>
                 </>
               )}
-              {isSignedIn && isAuthorized && (
+              {isSignedIn ? (
                 <div className="flex items-center gap-2">
                   {role && (
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -204,6 +154,12 @@ export function Dashboard() {
                   )}
                   <UserButton afterSignOutUrl="/" />
                 </div>
+              ) : (
+                <SignInButton mode="modal">
+                  <button className="px-4 py-2 text-sm font-medium text-[#006B3F] bg-white rounded-lg hover:bg-green-50 transition-colors shadow-md">
+                    Sign In
+                  </button>
+                </SignInButton>
               )}
             </div>
           </div>

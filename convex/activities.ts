@@ -2,7 +2,7 @@ import { v } from "convex/values";
 import { query, mutation } from "./_generated/server";
 
 // Helper function to check if user can edit
-async function canUserEdit(ctx: any, mdaId?: any): Promise<{ canEdit: boolean; userId?: string }> {
+async function canUserEdit(ctx: any): Promise<{ canEdit: boolean; userId?: string }> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) return { canEdit: false };
 
@@ -11,16 +11,11 @@ async function canUserEdit(ctx: any, mdaId?: any): Promise<{ canEdit: boolean; u
     .withIndex("by_clerk_id", (q: any) => q.eq("clerkId", identity.subject))
     .first();
 
-  if (!user || user.status !== "active") return { canEdit: false };
+  if (!user) return { canEdit: false };
 
-  // Admins can edit everything
-  if (user.role === "admin") return { canEdit: true, userId: identity.subject };
-
-  // Editors can edit if no MDA restrictions or assigned to this MDA
-  if (user.role === "editor") {
-    if (!mdaId) return { canEdit: true, userId: identity.subject };
-    if (!user.assignedMDAs || user.assignedMDAs.length === 0) return { canEdit: true, userId: identity.subject };
-    return { canEdit: user.assignedMDAs.includes(mdaId), userId: identity.subject };
+  // Admins and editors can edit
+  if (user.role === "admin" || user.role === "editor") {
+    return { canEdit: true, userId: identity.subject };
   }
 
   return { canEdit: false };
@@ -68,14 +63,10 @@ export const updateCompletion = mutation({
     const existing = await ctx.db.get(args.id);
     if (!existing) throw new Error("Activity not found");
 
-    // Get the MDA for this activity to check permissions
-    const reform = await ctx.db.get(existing.reformId);
-    if (!reform) throw new Error("Reform not found");
-
-    // Check if user can edit this MDA
-    const { canEdit, userId } = await canUserEdit(ctx, reform.mdaId);
+    // Check if user can edit
+    const { canEdit, userId } = await canUserEdit(ctx);
     if (!canEdit) {
-      throw new Error("You don't have permission to update this activity. Contact an admin to request editor access.");
+      throw new Error("You don't have permission to update activities. You need an Editor or Admin role.");
     }
 
     // Validate completion level

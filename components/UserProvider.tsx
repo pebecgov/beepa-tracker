@@ -1,15 +1,14 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useRef } from "react";
-import { useUser, useClerk } from "@clerk/nextjs";
+import { createContext, useContext, useEffect } from "react";
+import { useUser } from "@clerk/nextjs";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
 interface UserContextType {
   isLoading: boolean;
   isSignedIn: boolean;
-  isAuthorized: boolean;
-  authError: string | null;
+  needsRoleSelection: boolean;
   user: any;
   role: "admin" | "editor" | "viewer" | null;
   canEdit: boolean;
@@ -19,8 +18,7 @@ interface UserContextType {
 const UserContext = createContext<UserContextType>({
   isLoading: true,
   isSignedIn: false,
-  isAuthorized: false,
-  authError: null,
+  needsRoleSelection: false,
   user: null,
   role: null,
   canEdit: false,
@@ -33,86 +31,32 @@ export function useAppUser() {
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const { isLoaded, isSignedIn } = useUser();
-  const authCheck = useQuery(api.users.isAuthorized);
   const dbUser = useQuery(api.users.getCurrentUser);
-  const bootstrapAdmin = useMutation(api.users.bootstrapAdmin);
-  const linkPendingUser = useMutation(api.users.linkPendingUser);
-  
-  const [isBootstrapping, setIsBootstrapping] = useState(false);
-  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
-  const hasLinked = useRef(false);
+  const needsRole = useQuery(api.users.needsRoleSelection);
+  const updateLastLogin = useMutation(api.users.updateLastLogin);
 
-  // Link pending user on sign-in (if they were invited by email)
+  // Update last login when user signs in
   useEffect(() => {
-    const linkUser = async () => {
-      if (isLoaded && isSignedIn && !hasLinked.current) {
-        // Try to link if:
-        // 1. User exists but is pending
-        // 2. User is not found (might be pending with email mismatch)
-        // 3. authCheck says user exists but getCurrentUser didn't find them
-        const shouldLink = 
-          (dbUser !== undefined && dbUser?.status === "pending") ||
-          (dbUser === null && authCheck !== undefined);
-        
-        if (shouldLink) {
-          hasLinked.current = true;
-          try {
-            await linkPendingUser();
-          } catch (error) {
-            console.error("Error linking user:", error);
-          }
-        }
-      }
-    };
-    linkUser();
-  }, [isLoaded, isSignedIn, dbUser, authCheck, linkPendingUser]);
-
-  // Handle bootstrap for first admin
-  useEffect(() => {
-    const handleBootstrap = async () => {
-      if (
-        isLoaded && 
-        isSignedIn && 
-        authCheck?.reason === "not_invited" && 
-        !isBootstrapping &&
-        !bootstrapError
-      ) {
-        // Check if this could be the first user by trying to bootstrap
-        setIsBootstrapping(true);
-        try {
-          await bootstrapAdmin();
-          // Refresh will happen automatically via Convex reactivity
-        } catch (error: any) {
-          // If bootstrap fails, it means there are existing users
-          setBootstrapError(error.message);
-        } finally {
-          setIsBootstrapping(false);
-        }
-      }
-    };
-    handleBootstrap();
-  }, [isLoaded, isSignedIn, authCheck, bootstrapAdmin, isBootstrapping, bootstrapError]);
+    if (isLoaded && isSignedIn && dbUser) {
+      updateLastLogin();
+    }
+  }, [isLoaded, isSignedIn, dbUser, updateLastLogin]);
 
   // Determine loading state
-  const isLoading = !isLoaded || (isSignedIn && (authCheck === undefined || dbUser === undefined));
-
-  // Determine authorization
-  const isAuthorized = authCheck?.authorized || false;
-  const authError = authCheck?.reason || null;
+  const isLoading = !isLoaded || (isSignedIn && (dbUser === undefined || needsRole === undefined));
 
   // User data
   const user = dbUser;
   const role = user?.role || null;
-  const canEdit = (role === "admin" || role === "editor") && user?.status === "active";
-  const isAdmin = role === "admin" && user?.status === "active";
+  const canEdit = role === "admin" || role === "editor";
+  const isAdmin = role === "admin";
 
   return (
     <UserContext.Provider
       value={{
-        isLoading: isLoading || isBootstrapping,
+        isLoading,
         isSignedIn: !!isSignedIn,
-        isAuthorized,
-        authError: bootstrapError || authError,
+        needsRoleSelection: needsRole === true,
         user,
         role,
         canEdit,

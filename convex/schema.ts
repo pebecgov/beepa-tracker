@@ -2,9 +2,16 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
-  // Users with roles for access control (invite-only)
+  // System settings (singleton - only one document)
+  settings: defineTable({
+    accessCode: v.string(), // Code needed to become editor/admin
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }),
+
+  // Users with roles for access control
   users: defineTable({
-    clerkId: v.optional(v.string()), // Optional until user accepts invite
+    clerkId: v.string(),
     email: v.string(),
     name: v.optional(v.string()),
     role: v.union(
@@ -12,22 +19,13 @@ export default defineSchema({
       v.literal("editor"),     // Can update activity statuses
       v.literal("viewer")      // Read-only access
     ),
-    status: v.optional(v.union(
-      v.literal("pending"),    // Invited but hasn't signed in yet
-      v.literal("active"),     // Has signed in and is active
-      v.literal("inactive")    // Deactivated by admin
-    )),
-    // Optional: Restrict editor to specific MDAs
-    assignedMDAs: v.optional(v.array(v.id("mdas"))),
-    invitedAt: v.optional(v.number()),
     lastLoginAt: v.optional(v.number()),
     createdAt: v.number(),
     updatedAt: v.number(),
   })
     .index("by_clerk_id", ["clerkId"])
     .index("by_email", ["email"])
-    .index("by_role", ["role"])
-    .index("by_status", ["status"]),
+    .index("by_role", ["role"]),
 
   // MDAs (Ministries/Departments/Agencies)
   mdas: defineTable({
