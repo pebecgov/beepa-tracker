@@ -4,7 +4,7 @@ import { Id } from "@/convex/_generated/dataModel";
 export type StatusLabel =
   | "Requires Intervention"
   | "Progressing With Difficulty"
-  | "Progressing"
+  | "In Progress"
   | "Progressing Well"
   | "Successful";
 

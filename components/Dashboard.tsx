@@ -244,7 +244,7 @@ export function Dashboard() {
         <section>
           <div className="flex flex-col gap-4 mb-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">MDA Rankings</h2>
+              <h2 className="text-lg font-semibold text-gray-900">MDA BEEPARankings</h2>
 
               <div className="flex items-center gap-3">
                 {/* Search Input */}
@@ -291,7 +291,7 @@ export function Dashboard() {
                         : "text-gray-600 hover:text-gray-900"
                         }`}
                     >
-                      <List size={14}/>
+                      <List size={14} />
                     </button>
                     <button
                       onClick={() => setViewMode("grid")}
@@ -300,7 +300,7 @@ export function Dashboard() {
                         : "text-gray-600 hover:text-gray-900"
                         }`}
                     >
-                    <LayoutGrid size={14}/>
+                      <LayoutGrid size={14} />
                     </button>
                   </div>
                 )}
