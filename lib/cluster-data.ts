@@ -162,7 +162,7 @@ export const CLUSTERS: Cluster[] = [
         id: "product-standards",
         name: "Product Standards & Safety Services Coordination Committee",
         meetingTime: "Friday 30/01/26 – 12:00pm",
-        lead: "Charles Wakji",
+        lead: "-",
         members: [
             { name: "Environmental Health Council of Nigeria (EHCON)" },
             { name: "Federal Produce Inspection Service (FPIS)" },
@@ -176,7 +176,7 @@ export const CLUSTERS: Cluster[] = [
         id: "commercial-communications",
         name: "Commercial Communications & Consumer Protection Committee",
         meetingTime: "Thursday 29/01/26 – 1:00pm",
-        lead: "Olufemi Obafemi",
+        lead: "Oluwaseun Obafemi",
         members: [
             { name: "Advertising Regulatory Council of Nigeria (ARCON)" },
             { name: "Federal Competition and Consumer Protection Commission (FCCPC)" },

@@ -15,7 +15,7 @@ const PEBEC_MDAS = [
   { name: "National Identity Management Commission", abbreviation: "NIMC" },
   { name: "National Information Technology Development Agency", abbreviation: "NITDA" },
   { name: "Nigerian Communications Commission", abbreviation: "NCC" },
-  { name: "Nigerian Data Protection Commission", abbreviation: "NDPC" },
+  { name: "Nigeria Data Protection Commission", abbreviation: "NDPC" },
 
   // Business Entry, Formalisation & Growth Facilitation Committee
   { name: "Bureau for Public Procurement", abbreviation: "BPP" },
@@ -50,10 +50,10 @@ const PEBEC_MDAS = [
   { name: "Service Compact", abbreviation: "SERVICOM" },
 
   // Intellectual Property Services Harmonisation Committee
-  { name: "Federal Ministry of Industry, Trade and Investment - Trademarks Registry", abbreviation: "CLTR" },
+  { name: "FMITI - Trademarks Registry", abbreviation: "CLTR" },
   { name: "National Office for Technology Acquisition and Promotion", abbreviation: "NOTAP" },
   { name: "Nigerian Copyright Commission", abbreviation: "NiCC" },
-  { name: "Federal Ministry of Industry, Trade and Investment - Patent and Design Registry", abbreviation: "PDR" },
+  { name: "FMITI - Patent and Design Registry", abbreviation: "PDR" },
 
   // Business Finance & Risk Optimisation Committee
   { name: "Bank of Industry", abbreviation: "BOI" },
@@ -64,7 +64,7 @@ const PEBEC_MDAS = [
   { name: "Securities and Exchange Commission", abbreviation: "SEC" },
 
   // Investment Entry, Incentives & Free Zones Facilitation Committee
-  { name: "Nigerian Investment Promotion Council", abbreviation: "NIPC" },
+  { name: "Nigerian Investment Promotion Commission", abbreviation: "NIPC" },
   { name: "Oil & Gas Free Zone Authority", abbreviation: "OGFZA" },
   { name: "Nigeria Export Processing Zone Authority", abbreviation: "NEPZA" },
 
@@ -76,7 +76,7 @@ const PEBEC_MDAS = [
   { name: "Nigeria Immigration Service", abbreviation: "NIS" },
   { name: "Nigerian Maritime Administration and Safety Agency", abbreviation: "NIMASA" },
   { name: "Nigerian Ports Authority", abbreviation: "NPA" },
-  { name: "Nigerian Shippers' Council", abbreviation: "NSC" },
+  { name: "Nigerian Shippers Council", abbreviation: "NSC" },
   { name: "Ports Health Authority", abbreviation: "PHA" },
 
   // Product Standards & Safety Services Coordination Committee
