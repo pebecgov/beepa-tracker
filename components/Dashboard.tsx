@@ -244,7 +244,7 @@ export function Dashboard() {
         <section>
           <div className="flex flex-col gap-4 mb-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">MDA BEEPARankings</h2>
+              <h2 className="text-lg font-semibold text-gray-900">MDA BEEPA Rankings</h2>
 
               <div className="flex items-center gap-3">
                 {/* Search Input */}
