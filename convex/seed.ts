@@ -159,36 +159,56 @@ export const seedDatabase = mutation({
   },
 });
 
+// Clear database in batches to avoid Convex read limits
 export const clearDatabase = mutation({
   args: {},
   handler: async (ctx) => {
-    // Delete all activities
-    const activities = await ctx.db.query("activities").collect();
-    for (const activity of activities) {
-      await ctx.db.delete(activity._id);
+    let deletedCount = 0;
+    const BATCH_SIZE = 100;
+
+    // Delete activities in batches
+    let activities = await ctx.db.query("activities").take(BATCH_SIZE);
+    while (activities.length > 0) {
+      for (const activity of activities) {
+        await ctx.db.delete(activity._id);
+        deletedCount++;
+      }
+      activities = await ctx.db.query("activities").take(BATCH_SIZE);
     }
 
-    // Delete all reforms
-    const reforms = await ctx.db.query("reforms").collect();
-    for (const reform of reforms) {
-      await ctx.db.delete(reform._id);
+    // Delete reforms in batches
+    let reforms = await ctx.db.query("reforms").take(BATCH_SIZE);
+    while (reforms.length > 0) {
+      for (const reform of reforms) {
+        await ctx.db.delete(reform._id);
+        deletedCount++;
+      }
+      reforms = await ctx.db.query("reforms").take(BATCH_SIZE);
     }
 
-    // Delete all MDAs
-    const mdas = await ctx.db.query("mdas").collect();
-    for (const mda of mdas) {
-      await ctx.db.delete(mda._id);
+    // Delete MDAs in batches
+    let mdas = await ctx.db.query("mdas").take(BATCH_SIZE);
+    while (mdas.length > 0) {
+      for (const mda of mdas) {
+        await ctx.db.delete(mda._id);
+        deletedCount++;
+      }
+      mdas = await ctx.db.query("mdas").take(BATCH_SIZE);
     }
 
-    // Delete all audit logs
-    const auditLogs = await ctx.db.query("auditLogs").collect();
-    for (const log of auditLogs) {
-      await ctx.db.delete(log._id);
+    // Delete audit logs in batches
+    let auditLogs = await ctx.db.query("auditLogs").take(BATCH_SIZE);
+    while (auditLogs.length > 0) {
+      for (const log of auditLogs) {
+        await ctx.db.delete(log._id);
+        deletedCount++;
+      }
+      auditLogs = await ctx.db.query("auditLogs").take(BATCH_SIZE);
     }
 
     return {
       success: true,
-      message: "Database cleared successfully",
+      message: `Database cleared successfully. Deleted ${deletedCount} records.`,
     };
   },
 });
