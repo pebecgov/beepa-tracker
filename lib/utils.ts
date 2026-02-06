@@ -5,7 +5,7 @@ import { Status, StatusLabel, StatusColor } from "./types";
 const STATUS_THRESHOLDS: Array<{ max: number; label: StatusLabel; color: StatusColor }> = [
   { max: 0.25, label: "Requires Intervention", color: "red" },
   { max: 0.4999, label: "Progressing With Difficulty", color: "orange" },
-  { max: 0.7499, label: "Progressing", color: "yellow" },
+  { max: 0.7499, label: "In Progress", color: "yellow" },
   { max: 0.9499, label: "Progressing Well", color: "blue" },
   { max: 1.01, label: "Successful", color: "green" },
 ];

@@ -10,7 +10,7 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { formatScore, getStatus } from "@/lib/utils";
+import { formatScore } from "@/lib/utils";
 import { ActivityStatus, Status } from "@/lib/types";
 import { useAppUser } from "@/components/UserProvider";
 
@@ -53,7 +53,7 @@ export default function MDAPage({ params }: MDAPageProps) {
       <header className="bg-white border-b border-gray-200 shadow-sm">
         {/* Green accent bar */}
         <div className="h-2 bg-pebec-gradient" />
-        
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {/* Back Button */}
           <Link
@@ -185,7 +185,7 @@ export default function MDAPage({ params }: MDAPageProps) {
 
 // Activities list component
 function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
-  const { isSignedIn, canEdit, isLoading: userLoading } = useAppUser();
+  const { canEdit } = useAppUser();
   const activities = useQuery(api.activities.listByReform, { reformId });
   const updateCompletion = useMutation(api.activities.updateCompletion);
   const [editingActivity, setEditingActivity] = useState<Id<"activities"> | null>(null);
@@ -209,8 +209,9 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
         status: newStatus,
       });
       toast.success("Activity updated!");
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update activity");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update activity";
+      toast.error(message);
     }
   };
 
@@ -239,8 +240,9 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
       });
       toast.success("Completion updated!");
       setEditingActivity(null);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update";
+      toast.error(message);
     }
   };
 
@@ -316,12 +318,11 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
                   >
                     <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                       <div
-                        className={`h-full transition-all ${
-                          activity.completionLevel >= 0.95 ? "bg-green-500" :
+                        className={`h-full transition-all ${activity.completionLevel >= 0.95 ? "bg-green-500" :
                           activity.completionLevel >= 0.75 ? "bg-blue-500" :
-                          activity.completionLevel >= 0.5 ? "bg-yellow-500" :
-                          activity.completionLevel > 0.25 ? "bg-orange-500" : "bg-red-400"
-                        }`}
+                            activity.completionLevel >= 0.5 ? "bg-yellow-500" :
+                              activity.completionLevel > 0.25 ? "bg-orange-500" : "bg-red-400"
+                          }`}
                         style={{ width: `${activity.completionLevel * 100}%` }}
                       />
                     </div>
@@ -339,45 +340,31 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
                     <button
                       onClick={() => handleQuickStatus(activity._id, "not_started")}
                       title="Set to 0%"
-                      className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-                        activity.status === "not_started"
-                          ? "bg-red-100 text-red-800 border-red-300 ring-1 ring-red-200"
-                          : "bg-white text-gray-500 border-gray-200 hover:border-red-300 hover:text-red-700"
-                      }`}
+                      className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${activity.status === "not_started"
+                        ? "bg-red-100 text-red-800 border-red-300 ring-1 ring-red-200"
+                        : "bg-white text-gray-500 border-gray-200 hover:border-red-300 hover:text-red-700"
+                        }`}
                     >
                       Not Started
                     </button>
                     <button
-                      onClick={() => handleQuickStatus(activity._id, "in_progress")}
-                      title="Set to 50%"
-                      className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-                        activity.status === "in_progress"
-                          ? "bg-yellow-100 text-yellow-800 border-yellow-300 ring-1 ring-yellow-200"
-                          : "bg-white text-gray-500 border-gray-200 hover:border-yellow-300 hover:text-yellow-700"
-                      }`}
-                    >
-                      In Progress
-                    </button>
-                    <button
                       onClick={() => handleQuickStatus(activity._id, "complete")}
                       title="Set to 100%"
-                      className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-                        activity.status === "complete"
-                          ? "bg-[#006B3F] text-white border-[#006B3F] ring-1 ring-[#006B3F]/30 shadow-sm"
-                          : "bg-white text-gray-500 border-gray-200 hover:border-[#006B3F] hover:text-[#006B3F]"
-                      }`}
+                      className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${activity.status === "complete"
+                        ? "bg-[#006B3F] text-white border-[#006B3F] ring-1 ring-[#006B3F]/30 shadow-sm"
+                        : "bg-white text-gray-500 border-gray-200 hover:border-[#006B3F] hover:text-[#006B3F]"
+                        }`}
                     >
                       Complete
                     </button>
                   </>
                 ) : (
-                  <span className={`px-3 py-1.5 text-xs font-medium rounded-lg ${
-                    activity.status === "complete"
-                      ? "bg-[#006B3F]/10 text-[#006B3F]"
-                      : activity.status === "in_progress"
+                  <span className={`px-3 py-1.5 text-xs font-medium rounded-lg ${activity.status === "complete"
+                    ? "bg-[#006B3F]/10 text-[#006B3F]"
+                    : activity.status === "in_progress"
                       ? "bg-yellow-100 text-yellow-800"
                       : "bg-red-100 text-red-800"
-                  }`}>
+                    }`}>
                     {activity.status === "complete" ? "Complete" : activity.status === "in_progress" ? "In Progress" : "Not Started"}
                   </span>
                 )}
