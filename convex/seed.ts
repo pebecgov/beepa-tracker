@@ -15,7 +15,7 @@ const PEBEC_MDAS = [
   { name: "Nigerian Electricity Management Service Agency", abbreviation: "NEMSA", description: "Enforces technical standards in the electricity industry" },
   { name: "Corporate Affairs Commission", abbreviation: "CAC", description: "Regulates the formation and management of companies" },
   { name: "Standards Organisation of Nigeria", abbreviation: "SON", description: "Develops and enforces standards for products and services" },
-  
+
   // Average Performers
   { name: "Nigeria Broadcasting Commission", abbreviation: "NBC", description: "Regulates broadcasting services" },
   { name: "Nigerian Export Promotion Council", abbreviation: "NEPC", description: "Promotes non-oil exports" },
@@ -27,10 +27,10 @@ const PEBEC_MDAS = [
   { name: "Nigerian Electricity Regulatory Commission", abbreviation: "NERC", description: "Regulates the electricity industry" },
   { name: "National Pension Commission", abbreviation: "PenCom", description: "Regulates and supervises pension matters" },
   { name: "Federal Airports Authority of Nigeria", abbreviation: "FAAN", description: "Manages and operates Nigeria's airports" },
-  { name: "Federal Inland Revenue Service", abbreviation: "FIRS", description: "Administers federal taxes" },
+  { name: "Nigeria Revenue Service", abbreviation: "NRS", description: "Administers federal taxes" },
   { name: "Federal Road Safety Corps", abbreviation: "FRSC", description: "Ensures road safety and traffic management" },
   { name: "National Agency for Food and Drug Administration and Control", abbreviation: "NAFDAC", description: "Regulates food, drugs, and other products" },
-  
+
   // Below Average Performers
   { name: "Nigerian Airspace Management Agency", abbreviation: "NAMA", description: "Manages Nigerian airspace" },
   { name: "EFCC Special Control Unit Against Money Laundering", abbreviation: "SCUML", description: "Combats money laundering" },
@@ -45,7 +45,7 @@ const PEBEC_MDAS = [
   { name: "National Insurance Commission", abbreviation: "NAICOM", description: "Regulates the insurance industry" },
   { name: "Nigerian Agricultural Insurance Corporation", abbreviation: "NAIC", description: "Provides agricultural insurance" },
   { name: "Galaxy Backbone Limited", abbreviation: "GBB", description: "Provides government IT infrastructure" },
-  
+
   // Poor Performers
   { name: "Industrial Training Fund", abbreviation: "ITF", description: "Promotes skills acquisition in industry" },
   { name: "Securities and Exchange Commission", abbreviation: "SEC", description: "Regulates the capital market" },
@@ -64,21 +64,21 @@ const PEBEC_MDAS = [
   { name: "National Identity Management Commission", abbreviation: "NIMC", description: "Manages national identity database" },
   { name: "Service Compact", abbreviation: "SERVICOM", description: "Ensures service delivery in public institutions" },
   { name: "Advertising Regulatory Council of Nigeria", abbreviation: "ARCON", description: "Regulates advertising practice" },
-  
+
   // Additional MDAs (completing the 69)
+  { name: "Nigerian Data Protection Commission", abbreviation: "NDPC", description: "Regulates data protection and privacy in Nigeria" },
+  { name: "Nigeria Social Insurance Trust Fund", abbreviation: "NSITF", description: "Provides social security and insurance for employees" },
+  { name: "Rural Electrification Agency", abbreviation: "REA", description: "Implements rural electrification projects" },
+  { name: "Nigeria Gas Company", abbreviation: "NGC", description: "Transports and markets natural gas" },
+  { name: "Bureau of Public Service Reforms", abbreviation: "BPSR", description: "Initiates and coordinates public service reforms" },
+  { name: "Ports Health Authority", abbreviation: "PHA", description: "Ensures health safety at ports" },
   { name: "Central Bank of Nigeria", abbreviation: "CBN", description: "Manages monetary policy and banking regulation" },
   { name: "Federal Ministry of Finance", abbreviation: "FMoF", description: "Manages federal finances and economic policy" },
   { name: "Federal Ministry of Industry, Trade and Investment", abbreviation: "FMITI", description: "Promotes trade, investment and industrial development" },
-  { name: "Nigerian Police Force", abbreviation: "NPF", description: "Maintains law and order" },
-  { name: "Federal Fire Service", abbreviation: "FFS", description: "Provides fire prevention and emergency services" },
-  { name: "Nigeria Deposit Insurance Corporation", abbreviation: "NDIC", description: "Insures bank deposits" },
-  { name: "Asset Management Corporation of Nigeria", abbreviation: "AMCON", description: "Manages non-performing assets" },
   { name: "National Agency for Science and Engineering Infrastructure", abbreviation: "NASENI", description: "Develops science and engineering infrastructure" },
-  { name: "Raw Materials Research and Development Council", abbreviation: "RMRDC", description: "Promotes local sourcing of raw materials" },
   { name: "Small and Medium Enterprises Development Agency of Nigeria", abbreviation: "SMEDAN", description: "Promotes SME development" },
   { name: "Nigeria Incentive-Based Risk Sharing System for Agricultural Lending", abbreviation: "NIRSAL", description: "De-risks agricultural lending" },
   { name: "Federal Mortgage Bank of Nigeria", abbreviation: "FMBN", description: "Provides mortgage financing" },
-  { name: "Nigerian Tourism Development Corporation", abbreviation: "NTDC", description: "Promotes tourism development" },
 ];
 
 // Seed the database with all 69 MDAs and the BEEPA reform framework
