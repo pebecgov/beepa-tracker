@@ -86,11 +86,20 @@ export function Dashboard() {
     try {
       let totalDeleted = 0;
       let result;
+      let iterations = 0;
+      const MAX_ITERATIONS = 200; // Safety limit
       
       // Keep calling clearDatabase until done
       do {
         result = await clearDb();
         totalDeleted += result.deleted;
+        iterations++;
+        
+        // Safety check to prevent infinite loops
+        if (iterations >= MAX_ITERATIONS) {
+          toast.error("Clear operation taking too long. Please try again.");
+          return;
+        }
       } while (!result.done);
       
       toast.success(`Database cleared! Deleted ${totalDeleted} records.`);
