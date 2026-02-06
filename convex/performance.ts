@@ -6,7 +6,7 @@ import { v } from "convex/values";
 const STATUS_THRESHOLDS = [
   { max: 0.25, label: "Requires Intervention", color: "red" },
   { max: 0.4999, label: "Progressing With Difficulty", color: "orange" },
-  { max: 0.7499, label: "Progressing", color: "yellow" },
+  { max: 0.7499, label: "In Progress", color: "yellow" },
   { max: 0.9499, label: "Progressing Well", color: "blue" },
   { max: 1.01, label: "Successful", color: "green" },
 ] as const;
@@ -55,10 +55,15 @@ export const getReformPerformance = query({
       }
     }
 
+    let status = getStatus(weightedScore);
+    if (status.label === "Requires Intervention" && completedCount > 0) {
+      status = { label: "In Progress", color: "yellow" };
+    }
+
     return {
       reform,
       score: weightedScore,
-      status: getStatus(weightedScore),
+      status,
       activityCount: activities.length,
       completedCount,
       activities,
@@ -117,10 +122,15 @@ export const getMDAPerformance = query({
           }
         }
 
+        let status = getStatus(weightedScore);
+        if (status.label === "Requires Intervention" && completedCount > 0) {
+          status = { label: "In Progress", color: "yellow" };
+        }
+
         return {
           reform,
           score: weightedScore,
-          status: getStatus(weightedScore),
+          status,
           activityCount: activities.length,
           completedCount,
         };
@@ -134,10 +144,18 @@ export const getMDAPerformance = query({
     const mdaScore =
       reformPerformances.reduce((sum, r) => sum + r.score, 0) / reformPerformances.length;
 
+    let status = getStatus(mdaScore);
+    const hasInProgressReform = reformPerformances.some(
+      (r) => r.status.label !== "Requires Intervention"
+    );
+    if (status.label === "Requires Intervention" && hasInProgressReform) {
+      status = { label: "In Progress", color: "yellow" };
+    }
+
     return {
       mda,
       score: mdaScore,
-      status: getStatus(mdaScore),
+      status,
       reformCount: reforms.length,
       reforms: reformPerformances,
     };
@@ -166,30 +184,45 @@ export const getOverallPerformance = query({
           };
         }
 
-        // Calculate weighted score for each reform
-        const reformScores = await Promise.all(
+        // Calculate weighted score and status for each reform
+        const reformPerformances = await Promise.all(
           reforms.map(async (reform) => {
             const activities = await ctx.db
               .query("activities")
               .withIndex("by_reform", (q) => q.eq("reformId", reform._id))
               .collect();
 
-            if (activities.length === 0) return 0;
+            if (activities.length === 0) return { score: 0, status: getStatus(0) };
 
             let weightedScore = 0;
+            let completedCount = 0;
             for (const activity of activities) {
               weightedScore += activity.completionLevel * activity.weight;
+              if (activity.status === "complete") completedCount++;
             }
-            return weightedScore;
+
+            let status = getStatus(weightedScore);
+            if (status.label === "Requires Intervention" && completedCount > 0) {
+              status = { label: "In Progress", color: "yellow" };
+            }
+
+            return { score: weightedScore, status };
           })
         );
 
-        const mdaScore = reformScores.reduce((sum, s) => sum + s, 0) / reformScores.length;
+        const mdaScore = reformPerformances.reduce((sum, p) => sum + p.score, 0) / reformPerformances.length;
+        let status = getStatus(mdaScore);
+        const hasInProgressReform = reformPerformances.some(
+          (p) => p.status.label !== "Requires Intervention"
+        );
+        if (status.label === "Requires Intervention" && hasInProgressReform) {
+          status = { label: "In Progress", color: "yellow" };
+        }
 
         return {
           mda,
           score: mdaScore,
-          status: getStatus(mdaScore),
+          status,
           reformCount: reforms.length,
         };
       })
@@ -222,29 +255,45 @@ export const getRankedMDAs = query({
           };
         }
 
-        const reformScores = await Promise.all(
+
+        const reformPerformances = await Promise.all(
           reforms.map(async (reform) => {
             const activities = await ctx.db
               .query("activities")
               .withIndex("by_reform", (q) => q.eq("reformId", reform._id))
               .collect();
 
-            if (activities.length === 0) return 0;
+            if (activities.length === 0) return { score: 0, status: getStatus(0) };
 
             let weightedScore = 0;
+            let completedCount = 0;
             for (const activity of activities) {
               weightedScore += activity.completionLevel * activity.weight;
+              if (activity.status === "complete") completedCount++;
             }
-            return weightedScore;
+
+            let status = getStatus(weightedScore);
+            if (status.label === "Requires Intervention" && completedCount > 0) {
+              status = { label: "In Progress", color: "yellow" };
+            }
+
+            return { score: weightedScore, status };
           })
         );
 
-        const mdaScore = reformScores.reduce((sum, s) => sum + s, 0) / reformScores.length;
+        const mdaScore = reformPerformances.reduce((sum, p) => sum + p.score, 0) / reformPerformances.length;
+        let status = getStatus(mdaScore);
+        const hasInProgressReform = reformPerformances.some(
+          (p) => p.status.label !== "Requires Intervention"
+        );
+        if (status.label === "Requires Intervention" && hasInProgressReform) {
+          status = { label: "In Progress", color: "yellow" };
+        }
 
         return {
           mda,
           score: mdaScore,
-          status: getStatus(mdaScore),
+          status,
           reformCount: reforms.length,
           rank: 0,
         };
@@ -264,7 +313,7 @@ export const getRankedMDAs = query({
 // Get progress history for timeline chart (placeholder - can be enhanced with snapshots)
 export const getProgressHistory = query({
   args: {},
-  handler: async (ctx) => {
+  handler: async (_ctx) => {
     // This could be enhanced to store periodic snapshots
     // For now, return null to indicate no historical data
     return null;
@@ -326,23 +375,33 @@ export const getDashboardStats = query({
         continue;
       }
 
-      let mdaTotalScore = 0;
-      for (const reform of mdaReforms) {
+      const reformStatuses = mdaReforms.map((reform) => {
         const reformActs = activities.filter((a) => a.reformId === reform._id);
         let reformScore = 0;
+        let completedCount = 0;
         for (const act of reformActs) {
           reformScore += act.completionLevel * act.weight;
+          if (act.status === "complete") completedCount++;
         }
-        mdaTotalScore += reformScore;
-      }
+        let status = getStatus(reformScore);
+        if (status.label === "Requires Intervention" && completedCount > 0) {
+          status = { label: "In Progress", color: "yellow" };
+        }
+        return { score: reformScore, status };
+      });
 
-      const mdaScore = mdaTotalScore / mdaReforms.length;
-      const status = getStatus(mdaScore);
+      const mdaScore = reformStatuses.reduce((sum, s) => sum + s.score, 0) / mdaReforms.length;
+      let status = getStatus(mdaScore);
+      const hasInProgressReform = reformStatuses.some((s) => s.status.label !== "Requires Intervention");
+
+      if (status.label === "Requires Intervention" && hasInProgressReform) {
+        status = { label: "In Progress", color: "yellow" };
+      }
 
       if (status.label === "Requires Intervention") statusCounts.requiresIntervention++;
       else if (status.label === "Progressing With Difficulty")
         statusCounts.progressingWithDifficulty++;
-      else if (status.label === "Progressing") statusCounts.progressing++;
+      else if (status.label === "In Progress") statusCounts.progressing++;
       else if (status.label === "Progressing Well") statusCounts.progressingWell++;
       else if (status.label === "Successful") statusCounts.successful++;
     }

@@ -10,7 +10,7 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { formatScore, getStatus } from "@/lib/utils";
+import { formatScore } from "@/lib/utils";
 import { ActivityStatus, Status } from "@/lib/types";
 import { useAppUser } from "@/components/UserProvider";
 
@@ -53,7 +53,7 @@ export default function MDAPage({ params }: MDAPageProps) {
       <header className="bg-white border-b border-gray-200 shadow-sm">
         {/* Green accent bar */}
         <div className="h-2 bg-pebec-gradient" />
-        
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           {/* Back Button */}
           <Link
@@ -185,10 +185,9 @@ export default function MDAPage({ params }: MDAPageProps) {
 
 // Activities list component
 function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
-  const { isSignedIn, canEdit, isLoading: userLoading } = useAppUser();
+  const { canEdit } = useAppUser();
   const activities = useQuery(api.activities.listByReform, { reformId });
   const updateCompletion = useMutation(api.activities.updateCompletion);
-  const [editingActivity, setEditingActivity] = useState<Id<"activities"> | null>(null);
 
   const handleQuickStatus = async (
     activityId: Id<"activities">,
@@ -209,40 +208,12 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
         status: newStatus,
       });
       toast.success("Activity updated!");
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update activity");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to update activity";
+      toast.error(message);
     }
   };
 
-  const handleCompletionUpdate = async (
-    activityId: Id<"activities">,
-    completionLevel: number
-  ) => {
-    if (!canEdit) {
-      toast.error("You don't have permission to update activities");
-      return;
-    }
-
-    // Determine status based on completion level
-    let status: ActivityStatus = "not_started";
-    if (completionLevel >= 1) {
-      status = "complete";
-    } else if (completionLevel > 0) {
-      status = "in_progress";
-    }
-
-    try {
-      await updateCompletion({
-        id: activityId,
-        completionLevel,
-        status,
-      });
-      toast.success("Completion updated!");
-      setEditingActivity(null);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to update");
-    }
-  };
 
   if (!activities) {
     return (
@@ -273,118 +244,87 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
 
       {/* Activities */}
       <div className="divide-y divide-gray-100">
-        {sortedActivities.map((activity) => {
-          const isEditing = editingActivity === activity._id;
+        {sortedActivities.map((activity) => (
+          <div
+            key={activity._id}
+            className="px-5 py-4 grid grid-cols-12 gap-4 items-center hover:bg-gray-50 transition-colors"
+          >
+            {/* Ref Number */}
+            <div className="col-span-1">
+              <span className="text-sm font-mono text-gray-500">
+                {activity.refNumber}
+              </span>
+            </div>
 
-          return (
-            <div
-              key={activity._id}
-              className="px-5 py-4 grid grid-cols-12 gap-4 items-center hover:bg-gray-50 transition-colors"
-            >
-              {/* Ref Number */}
-              <div className="col-span-1">
-                <span className="text-sm font-mono text-gray-500">
-                  {activity.refNumber}
-                </span>
-              </div>
+            {/* Activity Name */}
+            <div className="col-span-4">
+              <p className="text-sm text-gray-900 leading-tight">{activity.name}</p>
+            </div>
 
-              {/* Activity Name */}
-              <div className="col-span-4">
-                <p className="text-sm text-gray-900 leading-tight">{activity.name}</p>
-              </div>
+            {/* Weight */}
+            <div className="col-span-1 text-center">
+              <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700">
+                {Math.round(activity.weight * 100)}%
+              </span>
+            </div>
 
-              {/* Weight */}
-              <div className="col-span-1 text-center">
-                <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700">
-                  {Math.round(activity.weight * 100)}%
-                </span>
-              </div>
-
-              {/* Completion Level */}
-              <div className="col-span-2">
-                {isEditing && canEdit ? (
-                  <CompletionEditor
-                    initialValue={activity.completionLevel}
-                    onSave={(value) => handleCompletionUpdate(activity._id, value)}
-                    onCancel={() => setEditingActivity(null)}
-                  />
-                ) : (
-                  <button
-                    onClick={() => canEdit && setEditingActivity(activity._id)}
-                    className={`w-full flex items-center justify-center gap-2 group ${!canEdit ? "cursor-default" : ""}`}
-                    disabled={!canEdit}
-                  >
-                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full transition-all ${
-                          activity.completionLevel >= 0.95 ? "bg-green-500" :
-                          activity.completionLevel >= 0.75 ? "bg-blue-500" :
-                          activity.completionLevel >= 0.5 ? "bg-yellow-500" :
+            {/* Completion Level */}
+            <div className="col-span-2">
+              <div className="w-full flex items-center justify-center gap-2">
+                <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all ${activity.completionLevel >= 0.95 ? "bg-green-500" :
+                      activity.completionLevel >= 0.75 ? "bg-blue-500" :
+                        activity.completionLevel >= 0.5 ? "bg-yellow-500" :
                           activity.completionLevel > 0.25 ? "bg-orange-500" : "bg-red-400"
-                        }`}
-                        style={{ width: `${activity.completionLevel * 100}%` }}
-                      />
-                    </div>
-                    <span className={`text-sm font-semibold text-gray-700 min-w-[45px] text-right ${canEdit ? "group-hover:text-[#006B3F]" : ""}`}>
-                      {Math.round(activity.completionLevel * 100)}%
-                    </span>
-                  </button>
-                )}
-              </div>
-
-              {/* Quick Status Buttons or View-only Status */}
-              <div className="col-span-4 flex items-center justify-center gap-1">
-                {canEdit ? (
-                  <>
-                    <button
-                      onClick={() => handleQuickStatus(activity._id, "not_started")}
-                      title="Set to 0%"
-                      className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-                        activity.status === "not_started"
-                          ? "bg-red-100 text-red-800 border-red-300 ring-1 ring-red-200"
-                          : "bg-white text-gray-500 border-gray-200 hover:border-red-300 hover:text-red-700"
                       }`}
-                    >
-                      Not Started
-                    </button>
-                    <button
-                      onClick={() => handleQuickStatus(activity._id, "in_progress")}
-                      title="Set to 50%"
-                      className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-                        activity.status === "in_progress"
-                          ? "bg-yellow-100 text-yellow-800 border-yellow-300 ring-1 ring-yellow-200"
-                          : "bg-white text-gray-500 border-gray-200 hover:border-yellow-300 hover:text-yellow-700"
-                      }`}
-                    >
-                      In Progress
-                    </button>
-                    <button
-                      onClick={() => handleQuickStatus(activity._id, "complete")}
-                      title="Set to 100%"
-                      className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${
-                        activity.status === "complete"
-                          ? "bg-[#006B3F] text-white border-[#006B3F] ring-1 ring-[#006B3F]/30 shadow-sm"
-                          : "bg-white text-gray-500 border-gray-200 hover:border-[#006B3F] hover:text-[#006B3F]"
-                      }`}
-                    >
-                      Complete
-                    </button>
-                  </>
-                ) : (
-                  <span className={`px-3 py-1.5 text-xs font-medium rounded-lg ${
-                    activity.status === "complete"
-                      ? "bg-[#006B3F]/10 text-[#006B3F]"
-                      : activity.status === "in_progress"
-                      ? "bg-yellow-100 text-yellow-800"
-                      : "bg-red-100 text-red-800"
-                  }`}>
-                    {activity.status === "complete" ? "Complete" : activity.status === "in_progress" ? "In Progress" : "Not Started"}
-                  </span>
-                )}
+                    style={{ width: `${activity.completionLevel * 100}%` }}
+                  />
+                </div>
+                <span className="text-sm font-semibold text-gray-700 min-w-[45px] text-right">
+                  {Math.round(activity.completionLevel * 100)}%
+                </span>
               </div>
             </div>
-          );
-        })}
+
+            {/* Quick Status Buttons or View-only Status */}
+            <div className="col-span-4 flex items-center justify-center gap-1">
+              {canEdit ? (
+                <>
+                  <button
+                    onClick={() => handleQuickStatus(activity._id, "not_started")}
+                    title="Set to 0%"
+                    className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${activity.status === "not_started"
+                      ? "bg-red-100 text-red-800 border-red-300 ring-1 ring-red-200"
+                      : "bg-white text-gray-500 border-gray-200 hover:border-red-300 hover:text-red-700"
+                      }`}
+                  >
+                    Not Started
+                  </button>
+                  <button
+                    onClick={() => handleQuickStatus(activity._id, "complete")}
+                    title="Set to 100%"
+                    className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${activity.status === "complete"
+                      ? "bg-[#006B3F] text-white border-[#006B3F] ring-1 ring-[#006B3F]/30 shadow-sm"
+                      : "bg-white text-gray-500 border-gray-200 hover:border-[#006B3F] hover:text-[#006B3F]"
+                      }`}
+                  >
+                    Complete
+                  </button>
+                </>
+              ) : (
+                <span className={`px-3 py-1.5 text-xs font-medium rounded-lg ${activity.status === "complete"
+                  ? "bg-[#006B3F]/10 text-[#006B3F]"
+                  : activity.status === "in_progress"
+                    ? "bg-yellow-100 text-yellow-800"
+                    : "bg-red-100 text-red-800"
+                  }`}>
+                  {activity.status === "complete" ? "Complete" : activity.status === "in_progress" ? "In Progress" : "Not Started"}
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Summary */}
@@ -416,52 +356,3 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
   );
 }
 
-// Inline completion editor component
-function CompletionEditor({
-  initialValue,
-  onSave,
-  onCancel,
-}: {
-  initialValue: number;
-  onSave: (value: number) => void;
-  onCancel: () => void;
-}) {
-  const [value, setValue] = useState(Math.round(initialValue * 100));
-
-  return (
-    <div className="flex items-center gap-1">
-      <input
-        type="number"
-        min="0"
-        max="100"
-        value={value}
-        onChange={(e) => setValue(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-        className="w-14 px-2 py-1 text-sm text-center border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-[#006B3F]"
-        autoFocus
-        onKeyDown={(e) => {
-          if (e.key === "Enter") onSave(value / 100);
-          if (e.key === "Escape") onCancel();
-        }}
-      />
-      <span className="text-xs text-gray-500">%</span>
-      <button
-        onClick={() => onSave(value / 100)}
-        className="p-1 text-[#006B3F] hover:bg-[#006B3F]/10 rounded"
-        title="Save"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-        </svg>
-      </button>
-      <button
-        onClick={onCancel}
-        className="p-1 text-gray-400 hover:bg-gray-100 rounded"
-        title="Cancel"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
-    </div>
-  );
-}

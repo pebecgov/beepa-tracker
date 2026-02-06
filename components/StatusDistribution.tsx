@@ -41,8 +41,8 @@ export function StatusDistribution({ stats }: StatusDistributionProps) {
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg relative overflow-hidden">
       {/* Accent line */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#006B3F] to-[#008B52]" />
-      
+      <div className="absolute top-0 left-0 right-0 h-1 bg-linear-to-r from-[#006B3F] to-[#008B52]" />
+
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Status Distribution</h3>
 
       {/* Stacked bar */}

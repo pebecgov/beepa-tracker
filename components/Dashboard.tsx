@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { UserButton, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
+import { List, LayoutGrid } from "lucide-react";
 import { useAppUser } from "./UserProvider";
 import { RoleSelection } from "./RoleSelection";
 
@@ -17,9 +18,10 @@ import { ProgressTimeline } from "./ProgressTimeline";
 import { MDACard } from "./MDACard";
 import { StatCardSkeleton, CardSkeleton, TableSkeleton } from "./ui/Skeleton";
 import { formatScore } from "@/lib/utils";
+import { ClusterView } from "./ClusterView";
 import { MDAPerformance, DashboardStats } from "@/lib/types";
 
-type ViewMode = "ranking" | "grid";
+type ViewMode = "ranking" | "grid" | "cluster";
 
 export function Dashboard() {
   const router = useRouter();
@@ -108,9 +110,9 @@ export function Dashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
             <div className="flex items-center gap-4">
-              <img 
-                src="/pebec-logo.png" 
-                alt="PEBEC Logo" 
+              <img
+                src="/pebec-logo.png"
+                alt="PEBEC Logo"
                 className="h-14 w-auto bg-white rounded-lg p-1 shadow-md"
               />
               <div>
@@ -144,11 +146,10 @@ export function Dashboard() {
               {isSignedIn ? (
                 <div className="flex items-center gap-2">
                   {role && (
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      role === "admin" ? "bg-purple-200 text-purple-800" :
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${role === "admin" ? "bg-purple-200 text-purple-800" :
                       role === "editor" ? "bg-blue-200 text-blue-800" :
-                      "bg-gray-200 text-gray-700"
-                    }`}>
+                        "bg-gray-200 text-gray-700"
+                      }`}>
                       {role}
                     </span>
                   )}
@@ -232,7 +233,7 @@ export function Dashboard() {
             <section className="mb-8">
               <StatusDistribution stats={stats as DashboardStats} />
             </section>
-            
+
             <section className="mb-8">
               <ProgressTimeline />
             </section>
@@ -241,66 +242,91 @@ export function Dashboard() {
 
         {/* Rankings / Grid Toggle */}
         <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">MDA Rankings</h2>
-            <div className="flex items-center gap-3">
-              {/* Search Input */}
-              <div className="relative">
-                <svg
-                  className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                  />
-                </svg>
-                <input
-                  type="text"
-                  placeholder="Search MDA..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 pr-4 py-2 w-64 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#006B3F] focus:border-transparent"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#006B3F]"
+          <div className="flex flex-col gap-4 mb-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900">MDA BEEPA Rankings</h2>
+
+              <div className="flex items-center gap-3">
+                {/* Search Input */}
+                <div className="relative">
+                  <svg
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                    />
+                  </svg>
+                  <input
+                    type="text"
+                    placeholder="Search MDA..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 pr-4 py-2 w-64 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#006B3F] focus:border-transparent"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#006B3F]"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
+                {/* View Toggle (Table/Grid) - Only valid for Overall view */}
+                {viewMode !== "cluster" && (
+                  <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
+                    <button
+                      onClick={() => setViewMode("ranking")}
+                      className={`px-3 cursor-pointer py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === "ranking"
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-600 hover:text-gray-900"
+                        }`}
+                    >
+                      <List size={14} />
+                    </button>
+                    <button
+                      onClick={() => setViewMode("grid")}
+                      className={`px-3 cursor-pointer py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === "grid"
+                        ? "bg-white text-gray-900 shadow-sm"
+                        : "text-gray-600 hover:text-gray-900"
+                        }`}
+                    >
+                      <LayoutGrid size={14} />
+                    </button>
+                  </div>
                 )}
               </div>
-              
-              {/* View Toggle */}
-              <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
-                <button
-                  onClick={() => setViewMode("ranking")}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                    viewMode === "ranking"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-600 hover:text-gray-900"
+            </div>
+
+            {/* Primary View Tabs */}
+            <div className="flex items-center gap-1 border-b border-gray-200">
+              <button
+                onClick={() => setViewMode("ranking")}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${viewMode !== "cluster"
+                  ? "border-[#006B3F] text-[#006B3F]"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                   }`}
-                >
-                  Table
-                </button>
-                <button
-                  onClick={() => setViewMode("grid")}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
-                    viewMode === "grid"
-                      ? "bg-white text-gray-900 shadow-sm"
-                      : "text-gray-600 hover:text-gray-900"
+              >
+                Overall Rankings
+              </button>
+              <button
+                onClick={() => setViewMode("cluster")}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${viewMode === "cluster"
+                  ? "border-[#006B3F] text-[#006B3F]"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
                   }`}
-                >
-                  Grid
-                </button>
-              </div>
+              >
+                Cluster Performance
+              </button>
             </div>
           </div>
 
@@ -315,7 +341,7 @@ export function Dashboard() {
             filteredRankings.length > 0 ? (
               viewMode === "ranking" ? (
                 <RankingTable rankings={filteredRankings as MDAPerformance[]} onRowClick={handleMDAClick} />
-              ) : (
+              ) : viewMode === "grid" ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {filteredRankings.map((mda) => (
                     <MDACard
@@ -326,6 +352,8 @@ export function Dashboard() {
                     />
                   ))}
                 </div>
+              ) : (
+                <ClusterView rankings={filteredRankings as MDAPerformance[]} onRowClick={handleMDAClick} />
               )
             ) : searchQuery ? (
               <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
@@ -393,12 +421,12 @@ export function Dashboard() {
                   <p className="text-gray-500 mb-4">
                     Setting up the BEEPA Reform Framework.
                   </p>
-                <button
-                  onClick={handleSeed}
-                  className="px-4 py-2 bg-[#006B3F] text-white font-medium rounded-lg hover:bg-[#005432] transition-colors shadow-md"
-                >
-                  Initialize Now
-                </button>
+                  <button
+                    onClick={handleSeed}
+                    className="px-4 py-2 bg-[#006B3F] text-white font-medium rounded-lg hover:bg-[#005432] transition-colors shadow-md"
+                  >
+                    Initialize Now
+                  </button>
                 </>
               )}
             </div>
