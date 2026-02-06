@@ -159,56 +159,98 @@ export const seedDatabase = mutation({
   },
 });
 
-// Clear database in batches to avoid Convex read limits
+// Clear a single batch - returns true if more data exists
+export const clearBatch = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const BATCH_SIZE = 200;
+    let deletedCount = 0;
+
+    // Delete activities first (they reference reforms)
+    const activities = await ctx.db.query("activities").take(BATCH_SIZE);
+    for (const activity of activities) {
+      await ctx.db.delete(activity._id);
+      deletedCount++;
+    }
+    if (activities.length === BATCH_SIZE) {
+      return { done: false, deleted: deletedCount, remaining: "activities" };
+    }
+
+    // Then reforms (they reference MDAs)
+    const reforms = await ctx.db.query("reforms").take(BATCH_SIZE);
+    for (const reform of reforms) {
+      await ctx.db.delete(reform._id);
+      deletedCount++;
+    }
+    if (reforms.length === BATCH_SIZE) {
+      return { done: false, deleted: deletedCount, remaining: "reforms" };
+    }
+
+    // Then MDAs
+    const mdas = await ctx.db.query("mdas").take(BATCH_SIZE);
+    for (const mda of mdas) {
+      await ctx.db.delete(mda._id);
+      deletedCount++;
+    }
+    if (mdas.length === BATCH_SIZE) {
+      return { done: false, deleted: deletedCount, remaining: "mdas" };
+    }
+
+    // Finally audit logs
+    const auditLogs = await ctx.db.query("auditLogs").take(BATCH_SIZE);
+    for (const log of auditLogs) {
+      await ctx.db.delete(log._id);
+      deletedCount++;
+    }
+    if (auditLogs.length === BATCH_SIZE) {
+      return { done: false, deleted: deletedCount, remaining: "auditLogs" };
+    }
+
+    return { done: true, deleted: deletedCount, remaining: null };
+  },
+});
+
+// Wrapper that calls clearBatch repeatedly from client
 export const clearDatabase = mutation({
   args: {},
   handler: async (ctx) => {
+    // Just clear one batch - client should call repeatedly until done
+    const BATCH_SIZE = 200;
     let deletedCount = 0;
-    const BATCH_SIZE = 100;
 
-    // Delete activities in batches
-    let activities = await ctx.db.query("activities").take(BATCH_SIZE);
-    while (activities.length > 0) {
-      for (const activity of activities) {
-        await ctx.db.delete(activity._id);
-        deletedCount++;
-      }
-      activities = await ctx.db.query("activities").take(BATCH_SIZE);
+    const activities = await ctx.db.query("activities").take(BATCH_SIZE);
+    for (const activity of activities) {
+      await ctx.db.delete(activity._id);
+      deletedCount++;
     }
 
-    // Delete reforms in batches
-    let reforms = await ctx.db.query("reforms").take(BATCH_SIZE);
-    while (reforms.length > 0) {
-      for (const reform of reforms) {
-        await ctx.db.delete(reform._id);
-        deletedCount++;
-      }
-      reforms = await ctx.db.query("reforms").take(BATCH_SIZE);
+    const reforms = await ctx.db.query("reforms").take(BATCH_SIZE);
+    for (const reform of reforms) {
+      await ctx.db.delete(reform._id);
+      deletedCount++;
     }
 
-    // Delete MDAs in batches
-    let mdas = await ctx.db.query("mdas").take(BATCH_SIZE);
-    while (mdas.length > 0) {
-      for (const mda of mdas) {
-        await ctx.db.delete(mda._id);
-        deletedCount++;
-      }
-      mdas = await ctx.db.query("mdas").take(BATCH_SIZE);
+    const mdas = await ctx.db.query("mdas").take(BATCH_SIZE);
+    for (const mda of mdas) {
+      await ctx.db.delete(mda._id);
+      deletedCount++;
     }
 
-    // Delete audit logs in batches
-    let auditLogs = await ctx.db.query("auditLogs").take(BATCH_SIZE);
-    while (auditLogs.length > 0) {
-      for (const log of auditLogs) {
-        await ctx.db.delete(log._id);
-        deletedCount++;
-      }
-      auditLogs = await ctx.db.query("auditLogs").take(BATCH_SIZE);
+    const auditLogs = await ctx.db.query("auditLogs").take(BATCH_SIZE);
+    for (const log of auditLogs) {
+      await ctx.db.delete(log._id);
+      deletedCount++;
     }
+
+    const hasMore = activities.length > 0 || reforms.length > 0 || mdas.length > 0 || auditLogs.length > 0;
 
     return {
       success: true,
-      message: `Database cleared successfully. Deleted ${deletedCount} records.`,
+      done: !hasMore,
+      deleted: deletedCount,
+      message: hasMore 
+        ? `Deleted ${deletedCount} records. More data remaining...` 
+        : `Database cleared successfully. Deleted ${deletedCount} records.`,
     };
   },
 });
