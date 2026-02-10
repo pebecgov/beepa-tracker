@@ -97,7 +97,7 @@ export const BEEPA_REFORMS: ReformTemplate[] = [
     refNumber: 7,
     name: "Digital Service Transparency & Online Access",
     activities: [
-      { ref: "7.1", name: "Responsive design across mobile, tablet, and desktop", weight: 0.25 },
+      { ref: "7.1", name: "Responsive design across Mobile, Tablet, and Desktop", weight: 0.25 },
       { ref: "7.2", name: "Payment integration where applicable", weight: 0.15 },
       { ref: "7.3", name: "Social media integration", weight: 0.10 },
       { ref: "7.4", name: "Multilingual support where applicable", weight: 0.10 },
