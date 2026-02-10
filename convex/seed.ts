@@ -239,3 +239,85 @@ export const clearDatabase = mutation({
     };
   },
 });
+
+// Migrate reform 7 activities to the updated version
+// This updates reform 7 from 9 activities to 6 activities with new names/weights
+export const migrateReform7 = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const reform7Template = BEEPA_REFORMS.find((r) => r.refNumber === 7);
+    if (!reform7Template) {
+      throw new Error("Reform 7 template not found");
+    }
+
+    // Find all reform 7 records
+    const reform7s = await ctx.db
+      .query("reforms")
+      .filter((q) => q.eq(q.field("refNumber"), 7))
+      .collect();
+
+    let updatedCount = 0;
+    let deletedCount = 0;
+    let createdCount = 0;
+
+    const now = Date.now();
+
+    for (const reform of reform7s) {
+      // Get all activities for this reform
+      const activities = await ctx.db
+        .query("activities")
+        .withIndex("by_reform", (q) => q.eq("reformId", reform._id))
+        .collect();
+
+      // Delete old activities (7.7, 7.8, 7.9)
+      const oldRefs = ["7.7", "7.8", "7.9"];
+      for (const activity of activities) {
+        if (oldRefs.includes(activity.refNumber)) {
+          await ctx.db.delete(activity._id);
+          deletedCount++;
+        }
+      }
+
+      // Update or create activities 7.1-7.6
+      for (const activityTemplate of reform7Template.activities) {
+        const existingActivity = activities.find(
+          (a) => a.refNumber === activityTemplate.ref
+        );
+
+        if (existingActivity) {
+          // Update existing activity
+          await ctx.db.patch(existingActivity._id, {
+            name: activityTemplate.name,
+            weight: activityTemplate.weight,
+            updatedAt: now,
+          });
+          updatedCount++;
+        } else {
+          // Create new activity
+          await ctx.db.insert("activities", {
+            reformId: reform._id,
+            refNumber: activityTemplate.ref,
+            name: activityTemplate.name,
+            weight: activityTemplate.weight,
+            completionLevel: 0,
+            status: "not_started",
+            createdAt: now,
+            updatedAt: now,
+          });
+          createdCount++;
+        }
+      }
+    }
+
+    return {
+      success: true,
+      message: `Migrated reform 7 for ${reform7s.length} MDAs`,
+      stats: {
+        reformsUpdated: reform7s.length,
+        activitiesUpdated: updatedCount,
+        activitiesDeleted: deletedCount,
+        activitiesCreated: createdCount,
+      },
+    };
+  },
+});

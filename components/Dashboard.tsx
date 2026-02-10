@@ -46,6 +46,7 @@ export function Dashboard() {
 
   const seedDb = useMutation(api.seed.seedDatabase);
   const clearDb = useMutation(api.seed.clearDatabase);
+  const migrateReform7 = useMutation(api.seed.migrateReform7);
 
   // Auto-initialize database if empty
   useEffect(() => {
@@ -110,6 +111,23 @@ export function Dashboard() {
     }
   };
 
+  const handleMigrateReform7 = async () => {
+    if (!confirm("This will update Reform 7 activities from 9 to 6 items. Continue?")) return;
+    try {
+      const result = await migrateReform7();
+      toast.success(
+        `Migration complete! Updated ${result.stats.reformsUpdated} reforms. ` +
+        `Updated: ${result.stats.activitiesUpdated}, ` +
+        `Deleted: ${result.stats.activitiesDeleted}, ` +
+        `Created: ${result.stats.activitiesCreated}`
+      );
+      // Refresh the page to show updated data
+      window.location.reload();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to migrate reform 7");
+    }
+  };
+
   const handleMDAClick = (mda: MDAPerformance) => {
     router.push(`/mda/${mda.mda._id}`);
   };
@@ -156,6 +174,12 @@ export function Dashboard() {
                     className="px-4 py-2 text-sm font-medium text-white bg-white/10 border border-white/30 rounded-lg hover:bg-white/20 transition-colors"
                   >
                     Clear Data
+                  </button>
+                  <button
+                    onClick={handleMigrateReform7}
+                    className="px-4 py-2 text-sm font-medium text-white bg-white/10 border border-white/30 rounded-lg hover:bg-white/20 transition-colors"
+                  >
+                    Migrate Reform 7
                   </button>
                 </>
               )}
