@@ -67,6 +67,7 @@ export interface MDAPerformance {
   score: number;
   status: Status;
   reformCount: number;
+  activityCount?: number;
   reforms?: ReformPerformance[];
   rank?: number;
 }

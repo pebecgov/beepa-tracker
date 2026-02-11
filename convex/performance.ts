@@ -251,11 +251,13 @@ export const getRankedMDAs = query({
             score: 0,
             status: getStatus(0),
             reformCount: 0,
+            activityCount: 0,
             rank: 0,
           };
         }
 
 
+        let totalActivities = 0;
         const reformPerformances = await Promise.all(
           reforms.map(async (reform) => {
             const activities = await ctx.db
@@ -263,6 +265,7 @@ export const getRankedMDAs = query({
               .withIndex("by_reform", (q) => q.eq("reformId", reform._id))
               .collect();
 
+            totalActivities += activities.length;
             if (activities.length === 0) return { score: 0, status: getStatus(0) };
 
             let weightedScore = 0;
@@ -295,18 +298,42 @@ export const getRankedMDAs = query({
           score: mdaScore,
           status,
           reformCount: reforms.length,
+          activityCount: totalActivities,
           rank: 0,
         };
       })
     );
 
-    // Sort by score descending and assign ranks
-    const sorted = performances.sort((a, b) => b.score - a.score);
-    sorted.forEach((item, index) => {
+    // Separate MDAs with data from those without data
+    // An MDA "has data" if it has activities AND score > 0 (meaning some progress has been made)
+    const withData: typeof performances = [];
+    const withoutData: typeof performances = [];
+
+    for (const perf of performances) {
+      // Check if MDA has data: has activities and score > 0
+      // If score is 0 but activities exist, it means all activities are not_started (no data yet)
+      const hasData = (perf.activityCount ?? 0) > 0 && perf.score > 0;
+      if (hasData) {
+        withData.push(perf);
+      } else {
+        withoutData.push(perf);
+      }
+    }
+
+    // Sort MDAs with data by score descending and assign sequential ranks
+    withData.sort((a, b) => b.score - a.score);
+    withData.forEach((item, index) => {
       item.rank = index + 1;
     });
 
-    return sorted;
+    // All MDAs without data get the same rank (next rank after the last MDA with data)
+    const nextRank = withData.length > 0 ? withData.length + 1 : 1;
+    withoutData.forEach((item) => {
+      item.rank = nextRank;
+    });
+
+    // Combine and return (with data first, then without data)
+    return [...withData, ...withoutData];
   },
 });
 
