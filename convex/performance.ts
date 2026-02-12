@@ -2,12 +2,12 @@ import { query } from "./_generated/server";
 import { v } from "convex/values";
 
 // Status thresholds and labels (based on PEBEC standards)
-// =IF(score<=0.25,"Requires Intervention",IF(score<0.5,"Progressing With Difficulty",IF(score<0.75,"Progressing",IF(score<0.95,"Progressing Well",IF(score>=0.95,"Successful","")))))
+// Requires Intervention: 0-30%, Progressing With Difficulty: 31-49%, Progressing: 50-70%, Progressing Well: 71-89%, Successful: 90-100%
 const STATUS_THRESHOLDS = [
-  { max: 0.25, label: "Requires Intervention", color: "red" },
-  { max: 0.4999, label: "Progressing With Difficulty", color: "orange" },
-  { max: 0.7499, label: "In Progress", color: "yellow" },
-  { max: 0.9499, label: "Progressing Well", color: "blue" },
+  { max: 0.30, label: "Requires Intervention", color: "red" },
+  { max: 0.49, label: "Progressing With Difficulty", color: "orange" },
+  { max: 0.70, label: "In Progress", color: "yellow" },
+  { max: 0.89, label: "Progressing Well", color: "blue" },
   { max: 1.01, label: "Successful", color: "green" },
 ] as const;
 

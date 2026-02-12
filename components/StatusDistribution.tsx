@@ -15,26 +15,31 @@ export function StatusDistribution({ stats }: StatusDistributionProps) {
       label: "Successful",
       count: statusCounts.successful,
       color: "green" as const,
+      range: "90% - 100%",
     },
     {
       label: "Progressing Well",
       count: statusCounts.progressingWell,
       color: "blue" as const,
+      range: "71% - 89%",
     },
     {
       label: "Progressing",
       count: statusCounts.progressing,
       color: "yellow" as const,
+      range: "50% - 70%",
     },
     {
       label: "Progressing With Difficulty",
       count: statusCounts.progressingWithDifficulty,
       color: "orange" as const,
+      range: "31% - 49%",
     },
     {
       label: "Requires Intervention",
       count: statusCounts.requiresIntervention,
       color: "red" as const,
+      range: "0% - 30%",
     },
   ];
 
@@ -73,7 +78,10 @@ export function StatusDistribution({ stats }: StatusDistributionProps) {
           return (
             <div key={item.label} className="flex items-center gap-2">
               <div className={`w-3 h-3 rounded-full ${colors.progress}`} />
-              <span className="text-sm text-gray-600">{item.label}</span>
+              <div className="flex-1">
+                <span className="text-sm text-gray-600">{item.label}</span>
+                <span className="text-xs text-gray-400 ml-2">({item.range})</span>
+              </div>
               <span className="text-sm font-medium text-gray-900 ml-auto">
                 {item.count} ({Math.round(percentage)}%)
               </span>

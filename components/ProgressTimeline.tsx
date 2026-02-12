@@ -94,7 +94,7 @@ export function ProgressTimeline({ cycleStartDate }: ProgressTimelineProps) {
               style={{ bottom: "95%" }}
             >
               <span className="absolute right-0 -top-5 text-xs text-[#006B3F] font-medium">
-                Target: 95%
+                Target: 100%
               </span>
             </div>
 
