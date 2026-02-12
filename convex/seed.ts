@@ -45,6 +45,7 @@ const PEBEC_MDAS = [
   { name: "Nigerian Midstream and Downstream Petroleum Regulatory Authority", abbreviation: "NMDPRA" },
   { name: "Nigerian Upstream Petroleum Regulatory Commission", abbreviation: "NUPRC" },
 
+
   // Public Service Delivery Enablement Committee
   { name: "Bureau of Public Service Reforms", abbreviation: "BPSR" },
   { name: "Service Compact", abbreviation: "SERVICOM" },
@@ -317,6 +318,76 @@ export const migrateReform7 = mutation({
         activitiesUpdated: updatedCount,
         activitiesDeleted: deletedCount,
         activitiesCreated: createdCount,
+      },
+    };
+  },
+});
+
+// Sync any missing MDAs from the master list without deleting existing data
+export const syncMDAs = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const existingMDAs = await ctx.db.query("mdas").collect();
+    const now = Date.now();
+    let mdaCount = 0;
+    let reformCount = 0;
+    let activityCount = 0;
+
+    for (const mdaInfo of PEBEC_MDAS) {
+      // Check if MDA exists by name or abbreviation (case-insensitive check would be better but simple check first)
+      const exists = existingMDAs.find(
+        (m) =>
+          m.name === mdaInfo.name ||
+          (m.abbreviation &&
+            mdaInfo.abbreviation &&
+            m.abbreviation === mdaInfo.abbreviation)
+      );
+
+      if (!exists) {
+        // Create MDA
+        const mdaId = await ctx.db.insert("mdas", {
+          name: mdaInfo.name,
+          abbreviation: mdaInfo.abbreviation,
+          createdAt: now,
+          updatedAt: now,
+        });
+        mdaCount++;
+
+        // Create reforms and activities
+        for (const reformTemplate of BEEPA_REFORMS) {
+          const reformId = await ctx.db.insert("reforms", {
+            mdaId,
+            refNumber: reformTemplate.refNumber,
+            name: reformTemplate.name,
+            createdAt: now,
+            updatedAt: now,
+          });
+          reformCount++;
+
+          for (const activityTemplate of reformTemplate.activities) {
+            await ctx.db.insert("activities", {
+              reformId,
+              refNumber: activityTemplate.ref,
+              name: activityTemplate.name,
+              weight: activityTemplate.weight,
+              completionLevel: 0,
+              status: "not_started",
+              createdAt: now,
+              updatedAt: now,
+            });
+            activityCount++;
+          }
+        }
+      }
+    }
+
+    return {
+      success: true,
+      message: `Synced database. Added ${mdaCount} new MDAs.`,
+      stats: {
+        mdasAdded: mdaCount,
+        reformsAdded: reformCount,
+        activitiesAdded: activityCount,
       },
     };
   },

@@ -48,6 +48,7 @@ export function Dashboard() {
   const seedDb = useMutation(api.seed.seedDatabase);
   const clearDb = useMutation(api.seed.clearDatabase);
   const migrateReform7 = useMutation(api.seed.migrateReform7);
+  const syncMDAs = useMutation(api.seed.syncMDAs);
 
   // Auto-initialize database if empty
   useEffect(() => {
@@ -129,6 +130,21 @@ export function Dashboard() {
     }
   };
 
+  const handleSync = async () => {
+    try {
+      const result = await syncMDAs();
+      if (result.stats.mdasAdded > 0) {
+        toast.success(result.message);
+        // Refresh to show new data
+        window.location.reload();
+      } else {
+        toast.info("Database is already in sync. No new MDAs added.");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to sync database");
+    }
+  };
+
   const handleMDAClick = (mda: MDAPerformance) => {
     router.push(`/mda/${mda.mda._id}`);
   };
@@ -181,6 +197,12 @@ export function Dashboard() {
                     className="px-4 py-2 text-sm font-medium text-white bg-white/10 border border-white/30 rounded-lg hover:bg-white/20 transition-colors"
                   >
                     Migrate Reform 7
+                  </button>
+                  <button
+                    onClick={handleSync}
+                    className="px-4 py-2 text-sm font-medium text-white bg-[#006B3F] border border-white/20 rounded-lg hover:bg-[#005432] transition-colors shadow-md"
+                  >
+                    Sync MDAs
                   </button>
                 </>
               )}
