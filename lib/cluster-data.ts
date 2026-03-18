@@ -35,7 +35,7 @@ export const CLUSTERS: Cluster[] = [
             { name: "National Identity Management Commission (NIMC)" },
             { name: "National Information Technology Development Agency (NITDA)" },
             { name: "Nigerian Communications Commission (NCC)" },
-            { name: "Nigerian Data Protection Commission" },
+            { name: "Nigeria Data Protection Commission (NDPC)" },
         ],
     },
     {
@@ -49,7 +49,7 @@ export const CLUSTERS: Cluster[] = [
             { name: "Corporate Affairs Commission (CAC)" },
             { name: "EFCC – Special Control Unit for Money Laundering (SCUML)" },
             { name: "Industrial Training Fund (ITF)" },
-            { name: "Joint Tax Board (JTB)" },
+            { name: "Joint Revenue Board (JRB)" },
             { name: "National Identity Management Commission (NIMC)" },
             { name: "National Pension Commission (PENCOM)" },
             { name: "Nigeria Export Promotion Council (NEPC)" },
@@ -86,10 +86,8 @@ export const CLUSTERS: Cluster[] = [
         lead: "Adewale Bello",
         members: [
             { name: "Nigerian Content Development and Monitoring Board (NCDMB)" },
-            { name: "Nigeria Gas Company (NGC)" },
             { name: "Nigerian Midstream and Downstream Petroleum Regulatory Authority (NMDPRA)" },
             { name: "Nigerian Upstream Petroleum Regulatory Commission (NUPRC)" },
-            { name: "NNPC Ltd" },
         ],
     },
     {
@@ -109,10 +107,10 @@ export const CLUSTERS: Cluster[] = [
         meetingTime: "Thursday 29/01/26 – 3:00pm",
         lead: "Jaafar Shuaibu",
         members: [
-            { name: "Trademarks Registry (TMR)" },
+            { name: "FMITI - Trademarks Registry (CLTR)" },
             { name: "National Office for Technology Acquisition and Promotion" },
-            { name: "Nigerian Copyright Commission" },
-            { name: "Patents and Designs Registry (PDR)" },
+            { name: "Nigerian Copyright Commission (NiCC)" },
+            { name: "FMITI - Patent and Design Registry (PDR)" },
         ],
     },
     {
