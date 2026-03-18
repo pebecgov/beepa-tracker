@@ -1,5 +1,5 @@
-import { mutation } from "./_generated/server";
-import { BEEPA_REFORMS } from "./beepaFramework";
+import { mutation, query } from "./_generated/server";
+import { BEEPA_REFORMS, FRAMEWORK_VERSION } from "./beepaFramework";
 
 // Updated MDA list based on cluster assignments
 const PEBEC_MDAS = [
@@ -146,6 +146,13 @@ export const seedDatabase = mutation({
         }
       }
     }
+
+    // Set framework version
+    const settings = await getOrCreateSettings(ctx);
+    await ctx.db.patch(settings._id, {
+      frameworkVersion: FRAMEWORK_VERSION,
+      updatedAt: now,
+    });
 
     return {
       success: true,
@@ -318,6 +325,174 @@ export const migrateReform7 = mutation({
         activitiesDeleted: deletedCount,
         activitiesCreated: createdCount,
       },
+    };
+  },
+});
+
+// Get or create settings document
+async function getOrCreateSettings(ctx: any) {
+  let settings = await ctx.db.query("settings").first();
+  if (!settings) {
+    const now = Date.now();
+    settings = await ctx.db.insert("settings", {
+      accessCode: "DEFAULT_CODE", // Should be set separately
+      frameworkVersion: FRAMEWORK_VERSION,
+      createdAt: now,
+      updatedAt: now,
+    });
+  }
+  return settings;
+}
+
+// Smart sync: Updates database to match framework without losing user data
+export const syncFramework = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const now = Date.now();
+    let mdasCreated = 0;
+    let reformsCreated = 0;
+    let activitiesCreated = 0;
+    let activitiesUpdated = 0;
+    let activitiesDeleted = 0;
+
+    // Get or create settings
+    const settings = await getOrCreateSettings(ctx);
+    const currentVersion = settings.frameworkVersion || "0.0.0";
+    const needsUpdate = currentVersion !== FRAMEWORK_VERSION;
+
+    // Get all existing MDAs
+    const existingMDAs = await ctx.db.query("mdas").collect();
+    const mdaMap = new Map(existingMDAs.map(m => [m.name, m]));
+
+    // Sync MDAs
+    for (const mdaInfo of PEBEC_MDAS) {
+      let mda = mdaMap.get(mdaInfo.name);
+      if (!mda) {
+        const mdaId = await ctx.db.insert("mdas", {
+          name: mdaInfo.name,
+          abbreviation: mdaInfo.abbreviation,
+          createdAt: now,
+          updatedAt: now,
+        });
+        const newMda = await ctx.db.get(mdaId);
+        if (!newMda) throw new Error("Failed to create MDA");
+        mda = newMda as unknown as typeof mda;
+        mdasCreated++;
+      }
+
+      // Get existing reforms for this MDA
+      const existingReforms = await ctx.db
+        .query("reforms")
+        .withIndex("by_mda", (q) => q.eq("mdaId", mda!._id))
+        .collect();
+      const reformMap = new Map(existingReforms.map(r => [r.refNumber, r]));
+
+      // Sync reforms
+      for (const reformTemplate of BEEPA_REFORMS) {
+        let reform = reformMap.get(reformTemplate.refNumber);
+        if (!reform) {
+          const reformId = await ctx.db.insert("reforms", {
+            mdaId: mda!._id,
+            refNumber: reformTemplate.refNumber,
+            name: reformTemplate.name,
+            createdAt: now,
+            updatedAt: now,
+          });
+          const newReform = await ctx.db.get(reformId);
+          if (!newReform) throw new Error("Failed to create reform");
+          reform = newReform;
+          reformsCreated++;
+        } else if (reform.name !== reformTemplate.name) {
+          // Update reform name if changed
+          await ctx.db.patch(reform._id, {
+            name: reformTemplate.name,
+            updatedAt: now,
+          });
+        }
+
+        // Get existing activities for this reform
+        const existingActivities = await ctx.db
+          .query("activities")
+          .withIndex("by_reform", (q) => q.eq("reformId", reform!._id))
+          .collect();
+        const activityMap = new Map(existingActivities.map(a => [a.refNumber, a]));
+
+        // Track which activities should exist
+        const expectedRefs = new Set(reformTemplate.activities.map(a => a.ref));
+
+        // Update/create activities
+        for (const activityTemplate of reformTemplate.activities) {
+          const existing = activityMap.get(activityTemplate.ref);
+          if (existing) {
+            // Update name and weight if changed, but preserve completionLevel and status
+            if (existing.name !== activityTemplate.name || existing.weight !== activityTemplate.weight) {
+              await ctx.db.patch(existing._id, {
+                name: activityTemplate.name,
+                weight: activityTemplate.weight,
+                updatedAt: now,
+              });
+              activitiesUpdated++;
+            }
+          } else {
+            // Create missing activity
+            await ctx.db.insert("activities", {
+              reformId: reform._id,
+              refNumber: activityTemplate.ref,
+              name: activityTemplate.name,
+              weight: activityTemplate.weight,
+              completionLevel: 0,
+              status: "not_started",
+              createdAt: now,
+              updatedAt: now,
+            });
+            activitiesCreated++;
+          }
+        }
+
+        // Delete obsolete activities (not in framework anymore)
+        for (const [ref, activity] of activityMap) {
+          if (!expectedRefs.has(ref)) {
+            await ctx.db.delete(activity._id);
+            activitiesDeleted++;
+          }
+        }
+      }
+    }
+
+    // Update framework version
+    await ctx.db.patch(settings._id, {
+      frameworkVersion: FRAMEWORK_VERSION,
+      updatedAt: now,
+    });
+
+    return {
+      success: true,
+      message: `Framework synced to version ${FRAMEWORK_VERSION}`,
+      stats: {
+        mdasCreated,
+        reformsCreated,
+        activitiesCreated,
+        activitiesUpdated,
+        activitiesDeleted,
+        previousVersion: currentVersion,
+        newVersion: FRAMEWORK_VERSION,
+      },
+    };
+  },
+});
+
+// Check if framework sync is needed
+export const checkFrameworkSync = query({
+  args: {},
+  handler: async (ctx) => {
+    const settings = await ctx.db.query("settings").first();
+    const currentVersion = settings?.frameworkVersion || "0.0.0";
+    const needsSync = currentVersion !== FRAMEWORK_VERSION;
+
+    return {
+      currentVersion,
+      frameworkVersion: FRAMEWORK_VERSION,
+      needsSync,
     };
   },
 });

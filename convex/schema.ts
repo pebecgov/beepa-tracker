@@ -5,6 +5,7 @@ export default defineSchema({
   // System settings (singleton - only one document)
   settings: defineTable({
     accessCode: v.string(), // Code needed to become editor/admin
+    frameworkVersion: v.optional(v.string()), // Track BEEPA framework version
     createdAt: v.number(),
     updatedAt: v.number(),
   }),

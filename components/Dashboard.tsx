@@ -48,6 +48,8 @@ export function Dashboard() {
   const seedDb = useMutation(api.seed.seedDatabase);
   const clearDb = useMutation(api.seed.clearDatabase);
   const migrateReform7 = useMutation(api.seed.migrateReform7);
+  const syncFramework = useMutation(api.seed.syncFramework);
+  const frameworkSyncStatus = useQuery(api.seed.checkFrameworkSync);
 
   // Auto-initialize database if empty
   useEffect(() => {
@@ -129,6 +131,23 @@ export function Dashboard() {
     }
   };
 
+  const handleSyncFramework = async () => {
+    if (!confirm("This will sync the database with the current framework. Missing items will be added, existing items will be updated. Continue?")) return;
+    try {
+      const result = await syncFramework();
+      toast.success(
+        `Framework synced! ` +
+        `Created: ${result.stats.mdasCreated} MDAs, ${result.stats.reformsCreated} reforms, ${result.stats.activitiesCreated} activities. ` +
+        `Updated: ${result.stats.activitiesUpdated} activities. ` +
+        `Deleted: ${result.stats.activitiesDeleted} obsolete activities.`
+      );
+      // Refresh the page to show updated data
+      window.location.reload();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to sync framework");
+    }
+  };
+
   const handleMDAClick = (mda: MDAPerformance) => {
     router.push(`/mda/${mda.mda._id}`);
   };
@@ -175,6 +194,17 @@ export function Dashboard() {
                     className="px-4 py-2 text-sm font-medium text-white bg-white/10 border border-white/30 rounded-lg hover:bg-white/20 transition-colors"
                   >
                     Clear Data
+                  </button>
+                  <button
+                    onClick={handleSyncFramework}
+                    className={`px-4 py-2 text-sm font-medium border rounded-lg transition-colors ${
+                      frameworkSyncStatus?.needsSync
+                        ? "bg-yellow-500 text-white border-yellow-400 hover:bg-yellow-600"
+                        : "text-white bg-white/10 border-white/30 hover:bg-white/20"
+                    }`}
+                    title={frameworkSyncStatus?.needsSync ? `Framework update available: ${frameworkSyncStatus.currentVersion} → ${frameworkSyncStatus.frameworkVersion}` : "Sync framework"}
+                  >
+                    {frameworkSyncStatus?.needsSync ? "⚠ Sync Framework" : "Sync Framework"}
                   </button>
                   <button
                     onClick={handleMigrateReform7}
