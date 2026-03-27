@@ -288,38 +288,21 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
             {/* Quick Status Buttons or View-only Status */}
             <div className="col-span-4 flex items-center justify-center gap-1">
               {canEdit ? (
-                <>
-                  <button
-                    onClick={() => handleQuickStatus(activity._id, "not_started")}
-                    title="Set to 0%"
-                    className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${activity.status === "not_started"
-                      ? "bg-red-100 text-red-800 border-red-300 ring-1 ring-red-200"
-                      : "bg-white text-gray-500 border-gray-200 hover:border-red-300 hover:text-red-700"
-                      }`}
-                  >
-                    Not Started
-                  </button>
-                  <button
-                    onClick={() => handleQuickStatus(activity._id, "in_progress")}
-                    title="Set to 50%"
-                    className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${activity.status === "in_progress"
-                      ? "bg-amber-100 text-amber-800 border-amber-300 ring-1 ring-amber-200"
-                      : "bg-white text-gray-500 border-gray-200 hover:border-amber-300 hover:text-amber-700"
-                      }`}
-                  >
-                    Progressing
-                  </button>
-                  <button
-                    onClick={() => handleQuickStatus(activity._id, "complete")}
-                    title="Set to 100%"
-                    className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${activity.status === "complete"
-                      ? "bg-[#006B3F] text-white border-[#006B3F] ring-1 ring-[#006B3F]/30 shadow-sm"
-                      : "bg-white text-gray-500 border-gray-200 hover:border-[#006B3F] hover:text-[#006B3F]"
-                      }`}
-                  >
-                    Complete
-                  </button>
-                </>
+                <select
+                  value={activity.status}
+                  onChange={(e) => handleQuickStatus(activity._id, e.target.value as ActivityStatus)}
+                  className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-1 ${
+                    activity.status === "complete"
+                      ? "bg-[#006B3F]/10 text-[#006B3F] border-[#006B3F]/30 focus:ring-[#006B3F]"
+                      : activity.status === "in_progress"
+                      ? "bg-amber-100 text-amber-800 border-amber-300 focus:ring-amber-400"
+                      : "bg-red-100 text-red-800 border-red-300 focus:ring-red-400"
+                  }`}
+                >
+                  <option value="not_started">0%</option>
+                  <option value="in_progress">50%</option>
+                  <option value="complete">100%</option>
+                </select>
               ) : (
                 <span className={`px-3 py-1.5 text-xs font-medium rounded-lg ${activity.status === "complete"
                   ? "bg-[#006B3F]/10 text-[#006B3F]"
