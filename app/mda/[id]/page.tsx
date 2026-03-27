@@ -273,10 +273,8 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
               <div className="w-full flex items-center justify-center gap-2">
                 <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                   <div
-                    className={`h-full transition-all ${activity.completionLevel >= 0.95 ? "bg-green-500" :
-                      activity.completionLevel >= 0.75 ? "bg-blue-500" :
-                        activity.completionLevel >= 0.5 ? "bg-yellow-500" :
-                          activity.completionLevel > 0.25 ? "bg-orange-500" : "bg-red-400"
+                    className={`h-full transition-all ${activity.status === "complete" ? "bg-green-500" :
+                      activity.status === "in_progress" ? "bg-amber-500" : "bg-red-400"
                       }`}
                     style={{ width: `${activity.completionLevel * 100}%` }}
                   />
@@ -302,6 +300,16 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
                     Not Started
                   </button>
                   <button
+                    onClick={() => handleQuickStatus(activity._id, "in_progress")}
+                    title="Set to 50%"
+                    className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${activity.status === "in_progress"
+                      ? "bg-amber-100 text-amber-800 border-amber-300 ring-1 ring-amber-200"
+                      : "bg-white text-gray-500 border-gray-200 hover:border-amber-300 hover:text-amber-700"
+                      }`}
+                  >
+                    Progressing
+                  </button>
+                  <button
                     onClick={() => handleQuickStatus(activity._id, "complete")}
                     title="Set to 100%"
                     className={`px-2 py-1.5 text-xs font-medium rounded-lg border transition-all ${activity.status === "complete"
@@ -316,10 +324,10 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
                 <span className={`px-3 py-1.5 text-xs font-medium rounded-lg ${activity.status === "complete"
                   ? "bg-[#006B3F]/10 text-[#006B3F]"
                   : activity.status === "in_progress"
-                    ? "bg-yellow-100 text-yellow-800"
+                    ? "bg-amber-100 text-amber-800"
                     : "bg-red-100 text-red-800"
                   }`}>
-                  {activity.status === "complete" ? "Complete" : activity.status === "in_progress" ? "In Progress" : "Not Started"}
+                  {activity.status === "complete" ? "Complete" : activity.status === "in_progress" ? "Progressing" : "Not Started"}
                 </span>
               )}
             </div>
