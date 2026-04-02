@@ -23,14 +23,29 @@ export function ClusterView({ rankings, onRowClick }: ClusterViewProps) {
     const getMDAPerformance = (clusterMdaName: string) => {
         if (!rankings) return undefined;
 
-        // Normalize string for comparison
         const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-        const search = normalize(clusterMdaName);
+
+        // Extract abbreviation from brackets e.g. "Standards Organisation of Nigeria (SON)" → "SON"
+        const bracketMatch = clusterMdaName.match(/\(([^)]+)\)\s*$/);
+        const clusterAbbrev = bracketMatch ? normalize(bracketMatch[1]) : null;
+
+        // Strip the bracketed abbreviation to get the plain name
+        const clusterBaseName = normalize(clusterMdaName.replace(/\s*\([^)]+\)\s*$/, ""));
 
         return rankings.find(r => {
             const dbName = normalize(r.mda.name);
-            return dbName.includes(search) || search.includes(dbName) ||
-                (r.mda.abbreviation && search.includes(normalize(r.mda.abbreviation)));
+            const dbAbbrev = r.mda.abbreviation ? normalize(r.mda.abbreviation) : null;
+
+            // 1. Exact full name match
+            if (dbName === clusterBaseName) return true;
+
+            // 2. Exact abbreviation match (both must have an abbreviation and they must be identical)
+            if (clusterAbbrev && dbAbbrev && clusterAbbrev === dbAbbrev) return true;
+
+            // 3. DB name matches the full cluster string (including abbreviation) exactly
+            if (dbName === normalize(clusterMdaName)) return true;
+
+            return false;
         });
     };
 
