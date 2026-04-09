@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { use, useState } from "react";
+import { use, useMemo, useState } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
 
@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { formatScore } from "@/lib/utils";
 import { ActivityStatus, Status } from "@/lib/types";
 import { useAppUser } from "@/components/UserProvider";
+import { reformCountsTowardMdaScore } from "@/lib/beepa-scoring";
 
 interface MDAPageProps {
   params: Promise<{ id: string }>;
@@ -27,6 +28,20 @@ export default function MDAPage({ params }: MDAPageProps) {
   const [expandedReform, setExpandedReform] = useState<Id<"reforms"> | null>(null);
 
   const mdaPerformance = useQuery(api.performance.getMDAPerformance, { mdaId });
+
+  const nccScoreBreakdown = useMemo(() => {
+    if (!mdaPerformance) return null;
+    const { mda, reforms } = mdaPerformance;
+    if (mda.abbreviation !== "NCC" || !reforms?.length) return null;
+    const rows = [...reforms].sort((a, b) => a.reform.refNumber - b.reform.refNumber);
+    const sumAll = rows.reduce((acc, r) => acc + r.score, 0);
+    const averageAllReforms = sumAll / rows.length;
+    const scoringRows = rows.filter((r) => reformCountsTowardMdaScore(mda, r.reform.refNumber));
+    const sumScoring = scoringRows.reduce((acc, r) => acc + r.score, 0);
+    const averageScoringReforms =
+      scoringRows.length === 0 ? 0 : sumScoring / scoringRows.length;
+    return { rows, averageAllReforms, averageScoringReforms };
+  }, [mdaPerformance]);
 
   if (!mdaPerformance) {
     return (
@@ -47,7 +62,7 @@ export default function MDAPage({ params }: MDAPageProps) {
     );
   }
 
-  const { mda, score, status, reforms } = mdaPerformance;
+  const { mda, score, status, reforms, reformCount, scoringReformCount } = mdaPerformance;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -90,6 +105,67 @@ export default function MDAPage({ params }: MDAPageProps) {
               <span className="text-sm font-medium text-gray-700">Overall BEEPA Score</span>
               <span className="text-2xl font-bold text-[#006B3F]">{formatScore(score)}</span>
             </div>
+            {mda.abbreviation === "NCC" && (
+              <p className="text-xs text-gray-600 mb-2">
+                Based on reforms 1, 2, 3, 5, and 7 only. Reforms 4 and 6 are not applicable to NCC and
+                are excluded from this score.
+              </p>
+            )}
+            {nccScoreBreakdown && (
+              <div className="mb-3 rounded-lg border border-gray-200 bg-white/80 p-3 text-sm">
+                <p className="font-medium text-gray-800 mb-2">Why the overall score changed (NCC)</p>
+                <p className="text-xs text-gray-600 mb-3">
+                  The headline score is the average of the five applicable reforms only. Previously it
+                  was the average of all seven, so low scores on reforms 4 and 6 pulled the old number
+                  down.
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-left text-gray-500">
+                        <th className="py-1 pr-2 font-medium">Reform</th>
+                        <th className="py-1 pr-2 font-medium">Score</th>
+                        <th className="py-1 font-medium">In overall score</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {nccScoreBreakdown.rows.map((r) => {
+                        const counts = reformCountsTowardMdaScore(mda, r.reform.refNumber);
+                        return (
+                          <tr key={r.reform._id} className="border-b border-gray-100">
+                            <td className="py-1.5 pr-2">
+                              {r.reform.refNumber}. {r.reform.name}
+                            </td>
+                            <td className="py-1.5 pr-2 tabular-nums">{formatScore(r.score)}</td>
+                            <td className="py-1.5">
+                              {counts ? (
+                                <span className="text-green-800">Yes</span>
+                              ) : (
+                                <span className="text-amber-800">No (excluded)</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <dl className="mt-3 space-y-1 text-xs border-t border-gray-200 pt-3">
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-gray-600">Previous methodology (average of all 7 reforms)</dt>
+                    <dd className="font-semibold tabular-nums text-gray-900">
+                      {formatScore(nccScoreBreakdown.averageAllReforms)}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-gray-600">Current methodology (average of applicable reforms only)</dt>
+                    <dd className="font-semibold tabular-nums text-[#006B3F]">
+                      {formatScore(nccScoreBreakdown.averageScoringReforms)}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            )}
             <ProgressBar score={score} color={(status as Status).color} showLabel={false} size="lg" />
           </div>
         </div>
@@ -100,7 +176,12 @@ export default function MDAPage({ params }: MDAPageProps) {
         {/* Section Header */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold text-gray-900">
-            BEEPA Reforms ({reforms?.length || 0})
+            {`BEEPA Reforms (${reforms?.length || 0}${
+              scoringReformCount !== undefined &&
+              scoringReformCount !== reformCount
+                ? ` — ${scoringReformCount} counted toward overall score`
+                : ""
+            })`}
           </h2>
           <p className="text-sm text-gray-500">
             Click on a reform to view and update activities
@@ -143,6 +224,11 @@ export default function MDAPage({ params }: MDAPageProps) {
                             <h3 className="text-base font-semibold text-gray-900">
                               {reformPerf.reform.name}
                             </h3>
+                            {!reformCountsTowardMdaScore(mda, reformPerf.reform.refNumber) && (
+                              <span className="inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">
+                                Not included in overall score
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>

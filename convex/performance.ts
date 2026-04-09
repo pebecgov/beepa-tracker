@@ -1,5 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
+import { reformCountsTowardMdaScore } from "../lib/beepa-scoring";
 
 // Status thresholds and labels (based on PEBEC standards)
 // Requires Intervention: 0-30%, Progressing With Difficulty: 31-49%, Progressing: 50-70%, Progressing Well: 71-89%, Successful: 90-100%
@@ -140,12 +141,18 @@ export const getMDAPerformance = query({
     // Sort reforms by refNumber
     reformPerformances.sort((a, b) => a.reform.refNumber - b.reform.refNumber);
 
-    // MDA score is average of all reform scores
+    const scoringReforms = reformPerformances.filter((r) =>
+      reformCountsTowardMdaScore(mda, r.reform.refNumber)
+    );
+
+    // MDA score is average of reform scores that count for this MDA (e.g. NCC excludes reforms 4 & 6)
     const mdaScore =
-      reformPerformances.reduce((sum, r) => sum + r.score, 0) / reformPerformances.length;
+      scoringReforms.length === 0
+        ? 0
+        : scoringReforms.reduce((sum, r) => sum + r.score, 0) / scoringReforms.length;
 
     let status = getStatus(mdaScore);
-    const hasInProgressReform = reformPerformances.some(
+    const hasInProgressReform = scoringReforms.some(
       (r) => r.status.label !== "Requires Intervention"
     );
     if (status.label === "Requires Intervention" && hasInProgressReform) {
@@ -157,6 +164,7 @@ export const getMDAPerformance = query({
       score: mdaScore,
       status,
       reformCount: reforms.length,
+      scoringReformCount: scoringReforms.length,
       reforms: reformPerformances,
     };
   },
@@ -184,9 +192,22 @@ export const getOverallPerformance = query({
           };
         }
 
-        // Calculate weighted score and status for each reform
+        const reformsForScore = reforms.filter((r) =>
+          reformCountsTowardMdaScore(mda, r.refNumber)
+        );
+
+        if (reformsForScore.length === 0) {
+          return {
+            mda,
+            score: 0,
+            status: getStatus(0),
+            reformCount: reforms.length,
+          };
+        }
+
+        // Calculate weighted score and status for each reform that counts toward MDA score
         const reformPerformances = await Promise.all(
-          reforms.map(async (reform) => {
+          reformsForScore.map(async (reform) => {
             const activities = await ctx.db
               .query("activities")
               .withIndex("by_reform", (q) => q.eq("reformId", reform._id))
@@ -257,9 +278,24 @@ export const getRankedMDAs = query({
         }
 
 
+        const reformsForScore = reforms.filter((r) =>
+          reformCountsTowardMdaScore(mda, r.refNumber)
+        );
+
+        if (reformsForScore.length === 0) {
+          return {
+            mda,
+            score: 0,
+            status: getStatus(0),
+            reformCount: reforms.length,
+            activityCount: 0,
+            rank: 0,
+          };
+        }
+
         let totalActivities = 0;
         const reformPerformances = await Promise.all(
-          reforms.map(async (reform) => {
+          reformsForScore.map(async (reform) => {
             const activities = await ctx.db
               .query("activities")
               .withIndex("by_reform", (q) => q.eq("reformId", reform._id))
@@ -284,7 +320,9 @@ export const getRankedMDAs = query({
           })
         );
 
-        const mdaScore = reformPerformances.reduce((sum, p) => sum + p.score, 0) / reformPerformances.length;
+        const mdaScore =
+          reformPerformances.reduce((sum, p) => sum + p.score, 0) /
+          reformPerformances.length;
         let status = getStatus(mdaScore);
         const hasInProgressReform = reformPerformances.some(
           (p) => p.status.label !== "Requires Intervention"
@@ -298,6 +336,7 @@ export const getRankedMDAs = query({
           score: mdaScore,
           status,
           reformCount: reforms.length,
+          scoringReformCount: reformsForScore.length,
           activityCount: totalActivities,
           rank: 0,
         };
@@ -402,7 +441,16 @@ export const getDashboardStats = query({
         continue;
       }
 
-      const reformStatuses = mdaReforms.map((reform) => {
+      const mdaReformsForScore = mdaReforms.filter((r) =>
+        reformCountsTowardMdaScore(mda, r.refNumber)
+      );
+
+      if (mdaReformsForScore.length === 0) {
+        statusCounts.requiresIntervention++;
+        continue;
+      }
+
+      const reformStatuses = mdaReformsForScore.map((reform) => {
         const reformActs = activities.filter((a) => a.reformId === reform._id);
         let reformScore = 0;
         let completedCount = 0;
@@ -417,7 +465,7 @@ export const getDashboardStats = query({
         return { score: reformScore, status };
       });
 
-      const mdaScore = reformStatuses.reduce((sum, s) => sum + s.score, 0) / mdaReforms.length;
+      const mdaScore = reformStatuses.reduce((sum, s) => sum + s.score, 0) / mdaReformsForScore.length;
       let status = getStatus(mdaScore);
       const hasInProgressReform = reformStatuses.some((s) => s.status.label !== "Requires Intervention");
 
