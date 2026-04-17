@@ -15,7 +15,10 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { formatScore } from "@/lib/utils";
 import { ActivityStatus, Status } from "@/lib/types";
 import { useAppUser } from "@/components/UserProvider";
-import { reformCountsTowardMdaScore } from "@/lib/beepa-scoring";
+import {
+  mdaHasPartialReformScoring,
+  reformCountsTowardMdaScore,
+} from "@/lib/beepa-scoring";
 
 interface MDAPageProps {
   params: Promise<{ id: string }>;
@@ -29,10 +32,10 @@ export default function MDAPage({ params }: MDAPageProps) {
 
   const mdaPerformance = useQuery(api.performance.getMDAPerformance, { mdaId });
 
-  const nccScoreBreakdown = useMemo(() => {
+  const partialReformScoreBreakdown = useMemo(() => {
     if (!mdaPerformance) return null;
     const { mda, reforms } = mdaPerformance;
-    if (mda.abbreviation !== "NCC" || !reforms?.length) return null;
+    if (!mdaHasPartialReformScoring(mda) || !reforms?.length) return null;
     const rows = [...reforms].sort((a, b) => a.reform.refNumber - b.reform.refNumber);
     const sumAll = rows.reduce((acc, r) => acc + r.score, 0);
     const averageAllReforms = sumAll / rows.length;
@@ -111,14 +114,30 @@ export default function MDAPage({ params }: MDAPageProps) {
                 are excluded from this score.
               </p>
             )}
-            {nccScoreBreakdown && (
+            {mda.abbreviation === "GBB" && (
+              <p className="text-xs text-gray-600 mb-2">
+                Based on reforms 1, 2, 3, and 7 only. Reforms 4, 5, and 6 are not applicable to Galaxy
+                Backbone Limited and are excluded from this score.
+              </p>
+            )}
+            {partialReformScoreBreakdown && (
               <div className="mb-3 rounded-lg border border-gray-200 bg-white/80 p-3 text-sm">
-                <p className="font-medium text-gray-800 mb-2">Why the overall score changed (NCC)</p>
-                <p className="text-xs text-gray-600 mb-3">
-                  The headline score is the average of the five applicable reforms only. Previously it
-                  was the average of all seven, so low scores on reforms 4 and 6 pulled the old number
-                  down.
+                <p className="font-medium text-gray-800 mb-2">
+                  Why the overall score changed ({mda.abbreviation})
                 </p>
+                {mda.abbreviation === "NCC" ? (
+                  <p className="text-xs text-gray-600 mb-3">
+                    The headline score is the average of the five applicable reforms only. Previously it
+                    was the average of all seven, so low scores on reforms 4 and 6 pulled the old number
+                    down.
+                  </p>
+                ) : mda.abbreviation === "GBB" ? (
+                  <p className="text-xs text-gray-600 mb-3">
+                    The headline score is the average of the four applicable reforms only. Previously it
+                    was the average of all seven, so low scores on reforms 4, 5, and 6 pulled the old
+                    number down.
+                  </p>
+                ) : null}
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs border-collapse">
                     <thead>
@@ -129,7 +148,7 @@ export default function MDAPage({ params }: MDAPageProps) {
                       </tr>
                     </thead>
                     <tbody>
-                      {nccScoreBreakdown.rows.map((r) => {
+                      {partialReformScoreBreakdown.rows.map((r) => {
                         const counts = reformCountsTowardMdaScore(mda, r.reform.refNumber);
                         return (
                           <tr key={r.reform._id} className="border-b border-gray-100">
@@ -154,13 +173,13 @@ export default function MDAPage({ params }: MDAPageProps) {
                   <div className="flex justify-between gap-4">
                     <dt className="text-gray-600">Previous methodology (average of all 7 reforms)</dt>
                     <dd className="font-semibold tabular-nums text-gray-900">
-                      {formatScore(nccScoreBreakdown.averageAllReforms)}
+                      {formatScore(partialReformScoreBreakdown.averageAllReforms)}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4">
                     <dt className="text-gray-600">Current methodology (average of applicable reforms only)</dt>
                     <dd className="font-semibold tabular-nums text-[#006B3F]">
-                      {formatScore(nccScoreBreakdown.averageScoringReforms)}
+                      {formatScore(partialReformScoreBreakdown.averageScoringReforms)}
                     </dd>
                   </div>
                 </dl>

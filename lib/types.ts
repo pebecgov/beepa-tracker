@@ -67,7 +67,7 @@ export interface MDAPerformance {
   score: number;
   status: Status;
   reformCount: number;
-  /** Reforms included in overall MDA score (may be fewer than `reformCount`, e.g. NCC excludes 4 & 6) */
+  /** Reforms included in overall MDA score (may be fewer than `reformCount`, e.g. NCC: 4 & 6; GBB: 4–6) */
   scoringReformCount?: number;
   activityCount?: number;
   reforms?: ReformPerformance[];

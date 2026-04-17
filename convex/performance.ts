@@ -145,7 +145,7 @@ export const getMDAPerformance = query({
       reformCountsTowardMdaScore(mda, r.reform.refNumber)
     );
 
-    // MDA score is average of reform scores that count for this MDA (e.g. NCC excludes reforms 4 & 6)
+    // MDA score is average of reform scores that count for this MDA (e.g. NCC: 4 & 6; GBB: 4, 5 & 6)
     const mdaScore =
       scoringReforms.length === 0
         ? 0
