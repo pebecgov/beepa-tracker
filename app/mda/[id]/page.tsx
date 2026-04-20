@@ -105,7 +105,9 @@ export default function MDAPage({ params }: MDAPageProps) {
 
           <div className="mt-6 bg-gradient-to-r from-gray-50 to-white rounded-xl p-4 border border-gray-200">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">Overall BEEPA Score</span>
+              <span className="text-sm font-medium text-gray-700">
+                Overall BEEPA Score (Applicable Reforms)
+              </span>
               <span className="text-2xl font-bold text-[#006B3F]">{formatScore(score)}</span>
             </div>
             {mda.abbreviation === "NCC" && (
@@ -123,19 +125,17 @@ export default function MDAPage({ params }: MDAPageProps) {
             {partialReformScoreBreakdown && (
               <div className="mb-3 rounded-lg border border-gray-200 bg-white/80 p-3 text-sm">
                 <p className="font-medium text-gray-800 mb-2">
-                  Why the overall score changed ({mda.abbreviation})
+                  Current scoring method ({mda.abbreviation})
                 </p>
                 {mda.abbreviation === "NCC" ? (
                   <p className="text-xs text-gray-600 mb-3">
-                    The headline score is the average of the five applicable reforms only. Previously it
-                    was the average of all seven, so low scores on reforms 4 and 6 pulled the old number
-                    down.
+                    The headline score above is the average of the five applicable reforms only. The
+                    all-reforms number is shown below as a legacy reference.
                   </p>
                 ) : mda.abbreviation === "GBB" ? (
                   <p className="text-xs text-gray-600 mb-3">
-                    The headline score is the average of the four applicable reforms only. Previously it
-                    was the average of all seven, so low scores on reforms 4, 5, and 6 pulled the old
-                    number down.
+                    The headline score above is the average of the four applicable reforms only. The
+                    all-reforms number is shown below as a legacy reference.
                   </p>
                 ) : null}
                 <div className="overflow-x-auto">
@@ -144,7 +144,7 @@ export default function MDAPage({ params }: MDAPageProps) {
                       <tr className="border-b border-gray-200 text-left text-gray-500">
                         <th className="py-1 pr-2 font-medium">Reform</th>
                         <th className="py-1 pr-2 font-medium">Score</th>
-                        <th className="py-1 font-medium">In overall score</th>
+                        <th className="py-1 font-medium">Counts in current score</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -157,11 +157,7 @@ export default function MDAPage({ params }: MDAPageProps) {
                             </td>
                             <td className="py-1.5 pr-2 tabular-nums">{formatScore(r.score)}</td>
                             <td className="py-1.5">
-                              {counts ? (
-                                <span className="text-green-800">Yes</span>
-                              ) : (
-                                <span className="text-amber-800">No (excluded)</span>
-                              )}
+                              {counts ? <span className="text-green-800">Yes</span> : <span className="text-amber-800">No</span>}
                             </td>
                           </tr>
                         );
@@ -171,15 +167,17 @@ export default function MDAPage({ params }: MDAPageProps) {
                 </div>
                 <dl className="mt-3 space-y-1 text-xs border-t border-gray-200 pt-3">
                   <div className="flex justify-between gap-4">
-                    <dt className="text-gray-600">Previous methodology (average of all 7 reforms)</dt>
-                    <dd className="font-semibold tabular-nums text-gray-900">
-                      {formatScore(partialReformScoreBreakdown.averageAllReforms)}
+                    <dt className="text-gray-700 font-medium">
+                      Current methodology (average of applicable reforms only)
+                    </dt>
+                    <dd className="font-semibold tabular-nums text-[#006B3F]">
+                      {formatScore(partialReformScoreBreakdown.averageScoringReforms)}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-4">
-                    <dt className="text-gray-600">Current methodology (average of applicable reforms only)</dt>
-                    <dd className="font-semibold tabular-nums text-[#006B3F]">
-                      {formatScore(partialReformScoreBreakdown.averageScoringReforms)}
+                    <dt className="text-gray-500">Legacy methodology (average of all 7 reforms)</dt>
+                    <dd className="font-medium tabular-nums text-gray-700">
+                      {formatScore(partialReformScoreBreakdown.averageAllReforms)}
                     </dd>
                   </div>
                 </dl>
