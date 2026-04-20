@@ -31,7 +31,7 @@ export function ProgressTimeline({ cycleStartDate }: ProgressTimelineProps) {
   const currentPeriodIndex = PERIODS.findIndex(p => dayInCycle >= p.start && dayInCycle <= p.end);
 
   // Use historical data if available, otherwise use current score for visualization
-  const periodScores = historicalData || PERIODS.map((_, index) => {
+  const periodScores = historicalData?.periodScores || PERIODS.map((_, index) => {
     if (index < currentPeriodIndex) {
       // Past periods - show progression (simulated if no historical data)
       return stats ? (stats.averageScore * (index + 1)) / (currentPeriodIndex + 1) : 0;
@@ -43,8 +43,6 @@ export function ProgressTimeline({ cycleStartDate }: ProgressTimelineProps) {
       return null;
     }
   });
-
-  const maxScore = Math.max(...periodScores.filter((s): s is number => s !== null), 0.01);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-lg relative overflow-hidden">
@@ -60,7 +58,9 @@ export function ProgressTimeline({ cycleStartDate }: ProgressTimelineProps) {
         </div>
         <div className="text-right">
           <p className="text-sm text-gray-500">Current Score</p>
-          <p className="text-2xl font-bold text-[#006B3F]">{formatScore(stats?.averageScore || 0)}</p>
+          <p className="text-2xl font-bold text-[#006B3F]">
+            {formatScore(historicalData?.currentScore ?? stats?.averageScore ?? 0)}
+          </p>
         </div>
       </div>
 
@@ -177,6 +177,84 @@ export function ProgressTimeline({ cycleStartDate }: ProgressTimelineProps) {
           <span className="text-xs text-gray-600">Upcoming</span>
         </div>
       </div>
+
+      {historicalData?.periods && (
+        <div className="mt-6 border-t border-gray-100 pt-4">
+          <h4 className="text-sm font-semibold text-gray-900 mb-2">
+            MDA drivers by period
+          </h4>
+          <p className="text-xs text-gray-500 mb-3">
+            Shows which MDAs increased or reduced the score in each 15-day period.
+          </p>
+          <div className="space-y-3">
+            {historicalData.periods
+              .filter((period) => period.overallScore !== null)
+              .map((period) => (
+                <div key={period.label} className="rounded-lg border border-gray-200 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <p className="text-sm font-medium text-gray-800">{period.label}</p>
+                    <div className="text-xs text-gray-600 flex items-center gap-3">
+                      <span>
+                        Score: <span className="font-semibold text-gray-900">{formatScore(period.overallScore || 0)}</span>
+                      </span>
+                      <span>
+                        Change:{" "}
+                        <span
+                          className={`font-semibold ${
+                            (period.deltaFromPrevious || 0) > 0
+                              ? "text-green-700"
+                              : (period.deltaFromPrevious || 0) < 0
+                              ? "text-red-700"
+                              : "text-gray-700"
+                          }`}
+                        >
+                          {(period.deltaFromPrevious || 0) > 0 ? "+" : ""}
+                          {formatScore(period.deltaFromPrevious || 0)}
+                        </span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {period.mdaContributions.length > 0 ? (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-gray-200 text-left text-gray-500">
+                            <th className="py-1 pr-2 font-medium">MDA</th>
+                            <th className="py-1 pr-2 font-medium">Previous</th>
+                            <th className="py-1 pr-2 font-medium">Current</th>
+                            <th className="py-1 font-medium">Delta</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {period.mdaContributions.slice(0, 8).map((item) => (
+                            <tr key={`${period.label}-${item.mdaId}`} className="border-b border-gray-100">
+                              <td className="py-1.5 pr-2">
+                                {item.mdaAbbreviation ? `${item.mdaAbbreviation} - ${item.mdaName}` : item.mdaName}
+                              </td>
+                              <td className="py-1.5 pr-2 tabular-nums text-gray-700">{formatScore(item.previousScore)}</td>
+                              <td className="py-1.5 pr-2 tabular-nums text-gray-900">{formatScore(item.currentScore)}</td>
+                              <td
+                                className={`py-1.5 tabular-nums font-medium ${
+                                  item.delta > 0 ? "text-green-700" : item.delta < 0 ? "text-red-700" : "text-gray-700"
+                                }`}
+                              >
+                                {item.delta > 0 ? "+" : ""}
+                                {formatScore(item.delta)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">No MDA score changes recorded in this period.</p>
+                  )}
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
