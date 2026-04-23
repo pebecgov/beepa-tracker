@@ -45,6 +45,7 @@ export const CLUSTERS: Cluster[] = [
         lead: "Hussaina Abdulkadir",
         members: [
             { name: "Bureau for Public Procurement (BPP)" },
+            { name: "National Bureau of Statistics (NBS)" },
             { name: "Citizenship and Business Development Department (Ministry of Interior)" },
             { name: "Corporate Affairs Commission (CAC)" },
             { name: "EFCC – Special Control Unit for Money Laundering (SCUML)" },

@@ -19,6 +19,7 @@ const PEBEC_MDAS = [
 
   // Business Entry, Formalisation & Growth Facilitation Committee
   { name: "Bureau for Public Procurement", abbreviation: "BPP" },
+  { name: "National Bureau of Statistics", abbreviation: "NBS" },
 
   { name: "Ministry of Interior - Citizenship and Business Development Department", abbreviation: "CBDD" },
   { name: "Corporate Affairs Commission", abbreviation: "CAC" },
@@ -90,7 +91,7 @@ const PEBEC_MDAS = [
 ];
 
 // Total counts for reference
-export const TOTAL_MDAS = PEBEC_MDAS.length; // 60 MDAs
+export const TOTAL_MDAS = PEBEC_MDAS.length; // 61 MDAs
 export const TOTAL_REFORMS = BEEPA_REFORMS.length; // 7 reforms per MDA
 export const TOTAL_ACTIVITIES = BEEPA_REFORMS.reduce((sum, r) => sum + r.activities.length, 0); // 52 activities per MDA
 
