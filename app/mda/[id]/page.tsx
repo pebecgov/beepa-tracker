@@ -17,7 +17,9 @@ import { ActivityStatus, Status } from "@/lib/types";
 import { useAppUser } from "@/components/UserProvider";
 import {
   mdaHasPartialReformScoring,
+  mdaHasPartialActivityScoring,
   reformCountsTowardMdaScore,
+  activityCountsTowardMdaScore,
 } from "@/lib/beepa-scoring";
 
 interface MDAPageProps {
@@ -122,6 +124,12 @@ export default function MDAPage({ params }: MDAPageProps) {
                 Backbone Limited and are excluded from this score.
               </p>
             )}
+            {mda.abbreviation === "NIS" && (
+              <p className="text-xs text-gray-600 mb-2">
+                Based on all 7 reforms. Within Reform 6, activities 6.6 and 6.7 are not applicable to
+                NIS and are excluded from Reform 6&apos;s weighted score.
+              </p>
+            )}
             {partialReformScoreBreakdown && (
               <div className="mb-3 rounded-lg border border-gray-200 bg-white/80 p-3 text-sm">
                 <p className="font-medium text-gray-800 mb-2">
@@ -138,6 +146,7 @@ export default function MDAPage({ params }: MDAPageProps) {
                     all-reforms number is shown below as a legacy reference.
                   </p>
                 ) : null}
+
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs border-collapse">
                     <thead>
@@ -181,6 +190,47 @@ export default function MDAPage({ params }: MDAPageProps) {
                     </dd>
                   </div>
                 </dl>
+              </div>
+            )}
+            {mdaHasPartialActivityScoring(mda) && reforms && reforms.length > 0 && (
+              <div className="mb-3 rounded-lg border border-gray-200 bg-white/80 p-3 text-sm">
+                <p className="font-medium text-gray-800 mb-2">
+                  Current scoring method (NIS)
+                </p>
+                <p className="text-xs text-gray-600 mb-3">
+                  The headline score above covers all 7 reforms. Within Reform 6, activities 6.6 and
+                  6.7 are excluded from the weighted score — they are not applicable to NIS.
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-left text-gray-500">
+                        <th className="py-1 pr-2 font-medium">Reform</th>
+                        <th className="py-1 pr-2 font-medium">Score</th>
+                        <th className="py-1 font-medium">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...reforms]
+                        .sort((a, b) => a.reform.refNumber - b.reform.refNumber)
+                        .map((r) => (
+                          <tr key={r.reform._id} className="border-b border-gray-100">
+                            <td className="py-1.5 pr-2">
+                              {r.reform.refNumber}. {r.reform.name}
+                            </td>
+                            <td className="py-1.5 pr-2 tabular-nums">{formatScore(r.score)}</td>
+                            <td className="py-1.5">
+                              {r.reform.refNumber === 6 ? (
+                                <span className="text-amber-800">Activities 6.6 &amp; 6.7 excluded</span>
+                              ) : (
+                                <span className="text-green-800">All activities included</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
             <ProgressBar score={score} color={(status as Status).color} showLabel={false} size="lg" />
@@ -272,7 +322,11 @@ export default function MDAPage({ params }: MDAPageProps) {
 
                   {/* Expanded: Activities */}
                   {isExpanded && (
-                    <ActivitiesList reformId={reformPerf.reform._id} />
+                    <ActivitiesList
+                      reformId={reformPerf.reform._id}
+                      mda={mda}
+                      reformRefNumber={reformPerf.reform.refNumber}
+                    />
                   )}
                 </div>
               );
@@ -289,7 +343,15 @@ export default function MDAPage({ params }: MDAPageProps) {
 }
 
 // Activities list component
-function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
+function ActivitiesList({
+  reformId,
+  mda,
+  reformRefNumber,
+}: {
+  reformId: Id<"reforms">;
+  mda?: { abbreviation?: string | null };
+  reformRefNumber?: number;
+}) {
   const { canEdit } = useAppUser();
   const activities = useQuery(api.activities.listByReform, { reformId });
   const updateCompletion = useMutation(api.activities.updateCompletion);
@@ -364,6 +426,12 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
             {/* Activity Name */}
             <div className="col-span-4">
               <p className="text-sm text-gray-900 leading-tight">{activity.name}</p>
+              {mda && reformRefNumber !== undefined &&
+                !activityCountsTowardMdaScore(mda, reformRefNumber, activity.refNumber) && (
+                  <span className="inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 mt-1">
+                    Not included in score
+                  </span>
+              )}
             </div>
 
             {/* Weight */}
@@ -440,10 +508,13 @@ function ActivitiesList({ reformId }: { reformId: Id<"reforms"> }) {
           Weighted Score:{" "}
           <span className="text-gray-900 font-bold">
             {formatScore(
-              sortedActivities.reduce(
-                (sum, a) => sum + a.completionLevel * a.weight,
-                0
-              )
+              sortedActivities
+                .filter((a) =>
+                  mda && reformRefNumber !== undefined
+                    ? activityCountsTowardMdaScore(mda, reformRefNumber, a.refNumber)
+                    : true
+                )
+                .reduce((sum, a) => sum + a.completionLevel * a.weight, 0)
             )}
           </span>
         </span>

@@ -1,6 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
-import { reformCountsTowardMdaScore } from "../lib/beepa-scoring";
+import { reformCountsTowardMdaScore, activityCountsTowardMdaScore } from "../lib/beepa-scoring";
 
 // Status thresholds and labels (based on PEBEC standards)
 // Requires Intervention: 0-30%, Progressing With Difficulty: 31-49%, Progressing: 50-70%, Progressing Well: 71-89%, Successful: 90-100%
@@ -112,11 +112,12 @@ export const getMDAPerformance = query({
           };
         }
 
-        // Calculate weighted score for this reform
+        // Calculate weighted score for this reform (excluding activities not applicable to this MDA)
         let weightedScore = 0;
         let completedCount = 0;
 
         for (const activity of activities) {
+          if (!activityCountsTowardMdaScore(mda, reform.refNumber, activity.refNumber)) continue;
           weightedScore += activity.completionLevel * activity.weight;
           if (activity.status === "complete") {
             completedCount++;
@@ -218,6 +219,7 @@ export const getOverallPerformance = query({
             let weightedScore = 0;
             let completedCount = 0;
             for (const activity of activities) {
+              if (!activityCountsTowardMdaScore(mda, reform.refNumber, activity.refNumber)) continue;
               weightedScore += activity.completionLevel * activity.weight;
               if (activity.status === "complete") completedCount++;
             }
@@ -307,6 +309,7 @@ export const getRankedMDAs = query({
             let weightedScore = 0;
             let completedCount = 0;
             for (const activity of activities) {
+              if (!activityCountsTowardMdaScore(mda, reform.refNumber, activity.refNumber)) continue;
               weightedScore += activity.completionLevel * activity.weight;
               if (activity.status === "complete") completedCount++;
             }
@@ -482,10 +485,12 @@ export const getProgressHistory = query({
           const reformActs = reformActivities.get(reform._id) || [];
           if (reformActs.length === 0) return 0;
 
-          return reformActs.reduce((sum, activity) => {
-            const completion = activityState.get(activity._id) ?? 0;
-            return sum + completion * activity.weight;
-          }, 0);
+          return reformActs
+            .filter((activity) => activityCountsTowardMdaScore(mda, reform.refNumber, activity.refNumber))
+            .reduce((sum, activity) => {
+              const completion = activityState.get(activity._id) ?? 0;
+              return sum + completion * activity.weight;
+            }, 0);
         });
 
         const mdaScore =
@@ -642,6 +647,7 @@ export const getDashboardStats = query({
         let reformScore = 0;
         let completedCount = 0;
         for (const act of reformActs) {
+          if (!activityCountsTowardMdaScore(mda, reform.refNumber, act.refNumber)) continue;
           reformScore += act.completionLevel * act.weight;
           if (act.status === "complete") completedCount++;
         }
