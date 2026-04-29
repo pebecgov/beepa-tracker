@@ -114,24 +114,27 @@ export const getMDAPerformance = query({
 
         // Calculate weighted score for this reform (excluding activities not applicable to this MDA)
         let weightedScore = 0;
+        let totalApplicableWeight = 0;
         let completedCount = 0;
 
         for (const activity of activities) {
           if (!activityCountsTowardMdaScore(mda, reform.refNumber, activity.refNumber)) continue;
           weightedScore += activity.completionLevel * activity.weight;
+          totalApplicableWeight += activity.weight;
           if (activity.status === "complete") {
             completedCount++;
           }
         }
 
-        let status = getStatus(weightedScore);
+        const normalizedScore = totalApplicableWeight > 0 ? weightedScore / totalApplicableWeight : 0;
+        let status = getStatus(normalizedScore);
         if (status.label === "Requires Intervention" && completedCount > 0) {
           status = { label: "In Progress", color: "yellow" };
         }
 
         return {
           reform,
-          score: weightedScore,
+          score: normalizedScore,
           status,
           activityCount: activities.length,
           completedCount,
@@ -217,19 +220,22 @@ export const getOverallPerformance = query({
             if (activities.length === 0) return { score: 0, status: getStatus(0) };
 
             let weightedScore = 0;
+            let totalApplicableWeight = 0;
             let completedCount = 0;
             for (const activity of activities) {
               if (!activityCountsTowardMdaScore(mda, reform.refNumber, activity.refNumber)) continue;
               weightedScore += activity.completionLevel * activity.weight;
+              totalApplicableWeight += activity.weight;
               if (activity.status === "complete") completedCount++;
             }
 
-            let status = getStatus(weightedScore);
+            const normalizedScore = totalApplicableWeight > 0 ? weightedScore / totalApplicableWeight : 0;
+            let status = getStatus(normalizedScore);
             if (status.label === "Requires Intervention" && completedCount > 0) {
               status = { label: "In Progress", color: "yellow" };
             }
 
-            return { score: weightedScore, status };
+            return { score: normalizedScore, status };
           })
         );
 
@@ -307,19 +313,22 @@ export const getRankedMDAs = query({
             if (activities.length === 0) return { score: 0, status: getStatus(0) };
 
             let weightedScore = 0;
+            let totalApplicableWeight = 0;
             let completedCount = 0;
             for (const activity of activities) {
               if (!activityCountsTowardMdaScore(mda, reform.refNumber, activity.refNumber)) continue;
               weightedScore += activity.completionLevel * activity.weight;
+              totalApplicableWeight += activity.weight;
               if (activity.status === "complete") completedCount++;
             }
 
-            let status = getStatus(weightedScore);
+            const normalizedScore = totalApplicableWeight > 0 ? weightedScore / totalApplicableWeight : 0;
+            let status = getStatus(normalizedScore);
             if (status.label === "Requires Intervention" && completedCount > 0) {
               status = { label: "In Progress", color: "yellow" };
             }
 
-            return { score: weightedScore, status };
+            return { score: normalizedScore, status };
           })
         );
 
@@ -485,12 +494,15 @@ export const getProgressHistory = query({
           const reformActs = reformActivities.get(reform._id) || [];
           if (reformActs.length === 0) return 0;
 
-          return reformActs
-            .filter((activity) => activityCountsTowardMdaScore(mda, reform.refNumber, activity.refNumber))
-            .reduce((sum, activity) => {
-              const completion = activityState.get(activity._id) ?? 0;
-              return sum + completion * activity.weight;
-            }, 0);
+          const applicableActs = reformActs.filter((activity) =>
+            activityCountsTowardMdaScore(mda, reform.refNumber, activity.refNumber)
+          );
+          const totalApplicableWeight = applicableActs.reduce((sum, a) => sum + a.weight, 0);
+          const weightedSum = applicableActs.reduce((sum, activity) => {
+            const completion = activityState.get(activity._id) ?? 0;
+            return sum + completion * activity.weight;
+          }, 0);
+          return totalApplicableWeight > 0 ? weightedSum / totalApplicableWeight : 0;
         });
 
         const mdaScore =
@@ -645,17 +657,20 @@ export const getDashboardStats = query({
       const reformStatuses = mdaReformsForScore.map((reform) => {
         const reformActs = activities.filter((a) => a.reformId === reform._id);
         let reformScore = 0;
+        let totalApplicableWeight = 0;
         let completedCount = 0;
         for (const act of reformActs) {
           if (!activityCountsTowardMdaScore(mda, reform.refNumber, act.refNumber)) continue;
           reformScore += act.completionLevel * act.weight;
+          totalApplicableWeight += act.weight;
           if (act.status === "complete") completedCount++;
         }
-        let status = getStatus(reformScore);
+        const normalizedScore = totalApplicableWeight > 0 ? reformScore / totalApplicableWeight : 0;
+        let status = getStatus(normalizedScore);
         if (status.label === "Requires Intervention" && completedCount > 0) {
           status = { label: "In Progress", color: "yellow" };
         }
-        return { score: reformScore, status };
+        return { score: normalizedScore, status };
       });
 
       const mdaScore = reformStatuses.reduce((sum, s) => sum + s.score, 0) / mdaReformsForScore.length;

@@ -507,15 +507,16 @@ function ActivitiesList({
         <span className="font-medium text-gray-700">
           Weighted Score:{" "}
           <span className="text-gray-900 font-bold">
-            {formatScore(
-              sortedActivities
-                .filter((a) =>
-                  mda && reformRefNumber !== undefined
-                    ? activityCountsTowardMdaScore(mda, reformRefNumber, a.refNumber)
-                    : true
-                )
-                .reduce((sum, a) => sum + a.completionLevel * a.weight, 0)
-            )}
+            {(() => {
+              const applicable = sortedActivities.filter((a) =>
+                mda && reformRefNumber !== undefined
+                  ? activityCountsTowardMdaScore(mda, reformRefNumber, a.refNumber)
+                  : true
+              );
+              const totalWeight = applicable.reduce((sum, a) => sum + a.weight, 0);
+              const weightedSum = applicable.reduce((sum, a) => sum + a.completionLevel * a.weight, 0);
+              return formatScore(totalWeight > 0 ? weightedSum / totalWeight : 0);
+            })()}
           </span>
         </span>
       </div>
