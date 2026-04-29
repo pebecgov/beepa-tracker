@@ -302,6 +302,7 @@ export const getRankedMDAs = query({
         }
 
         let totalActivities = 0;
+        let lastApplicableActivityUpdate = 0;
         const reformPerformances = await Promise.all(
           reformsForScore.map(async (reform) => {
             const activities = await ctx.db
@@ -320,6 +321,9 @@ export const getRankedMDAs = query({
               weightedScore += activity.completionLevel * activity.weight;
               totalApplicableWeight += activity.weight;
               if (activity.status === "complete") completedCount++;
+              if (activity.updatedAt > lastApplicableActivityUpdate) {
+                lastApplicableActivityUpdate = activity.updatedAt;
+              }
             }
 
             const normalizedScore = totalApplicableWeight > 0 ? weightedScore / totalApplicableWeight : 0;
@@ -350,6 +354,7 @@ export const getRankedMDAs = query({
           reformCount: reforms.length,
           scoringReformCount: reformsForScore.length,
           activityCount: totalActivities,
+          lastApplicableActivityUpdate,
           rank: 0,
         };
       })
@@ -371,8 +376,12 @@ export const getRankedMDAs = query({
       }
     }
 
-    // Sort MDAs with data by score descending and assign sequential ranks
-    withData.sort((a, b) => b.score - a.score);
+    // Sort MDAs with data by score descending; break ties by who settled into that score first
+    withData.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      // Tie: the MDA whose applicable activities were last updated earlier achieved the score first
+      return (a.lastApplicableActivityUpdate ?? 0) - (b.lastApplicableActivityUpdate ?? 0);
+    });
     withData.forEach((item, index) => {
       item.rank = index + 1;
     });
