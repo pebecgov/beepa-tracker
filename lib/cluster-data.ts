@@ -98,7 +98,6 @@ export const CLUSTERS: Cluster[] = [
         lead: "Jaafar Shuaibu",
         members: [
             { name: "Bureau for Public Procurement (BPP)" },
-            { name: "Bureau of Public Service Reforms (BPSR)" },
             { name: "Service Compact (SERVICOM)" },
         ],
     },

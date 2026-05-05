@@ -5,11 +5,12 @@
 
 export function mdaHasPartialReformScoring(mda: { abbreviation?: string | null }): boolean {
   const a = mda.abbreviation;
-  return a === "NCC" || a === "GBB";
+  return a === "NCC" || a === "GBB" || a === "SERVICOM" || a === "NEXIM" || a === "BOI" || a === "SEC";
 }
 
 export function mdaHasPartialActivityScoring(mda: { abbreviation?: string | null }): boolean {
-  return mda.abbreviation === "NIS";
+  const a = mda.abbreviation;
+  return a === "NIS" || a === "SERVICOM";
 }
 
 export function reformCountsTowardMdaScore(
@@ -22,12 +23,26 @@ export function reformCountsTowardMdaScore(
   if (mda.abbreviation === "GBB") {
     return refNumber !== 4 && refNumber !== 5 && refNumber !== 6;
   }
+  if (mda.abbreviation === "SERVICOM") {
+    return refNumber !== 3 && refNumber !== 4 && refNumber !== 5 && refNumber !== 6;
+  }
+  if (mda.abbreviation === "NEXIM") {
+    return refNumber !== 6;
+  }
+  if (mda.abbreviation === "BOI") {
+    return refNumber !== 3 && refNumber !== 6;
+  }
+  if (mda.abbreviation === "SEC") {
+    return refNumber !== 4;
+  }
   return true;
 }
 
 /**
  * Returns false for activities that are excluded from an MDA's score.
- * Currently: NIS Reform 6 excludes activities 6.6 and 6.7.
+ * NIS Reform 6: excludes activities 6.6 and 6.7.
+ * SERVICOM Reform 7: excludes activity 7.2.
+ * SERVICOM Reform 2: excludes activities 2.9 and 2.10.
  */
 export function activityCountsTowardMdaScore(
   mda: { abbreviation?: string | null },
@@ -36,6 +51,12 @@ export function activityCountsTowardMdaScore(
 ): boolean {
   if (mda.abbreviation === "NIS" && reformRefNumber === 6) {
     return activityRefNumber !== "6.6" && activityRefNumber !== "6.7";
+  }
+  if (mda.abbreviation === "SERVICOM" && reformRefNumber === 7) {
+    return activityRefNumber !== "7.2";
+  }
+  if (mda.abbreviation === "SERVICOM" && reformRefNumber === 2) {
+    return activityRefNumber !== "2.9" && activityRefNumber !== "2.10";
   }
   return true;
 }

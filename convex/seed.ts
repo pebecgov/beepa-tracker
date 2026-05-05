@@ -47,7 +47,6 @@ const PEBEC_MDAS = [
   { name: "Nigerian Upstream Petroleum Regulatory Commission", abbreviation: "NUPRC" },
 
   // Public Service Delivery Enablement Committee
-  { name: "Bureau of Public Service Reforms", abbreviation: "BPSR" },
   { name: "Service Compact", abbreviation: "SERVICOM" },
 
   // Intellectual Property Services Harmonisation Committee
