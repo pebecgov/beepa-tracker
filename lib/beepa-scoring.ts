@@ -5,7 +5,7 @@
 
 export function mdaHasPartialReformScoring(mda: { abbreviation?: string | null }): boolean {
   const a = mda.abbreviation;
-  return a === "NCC" || a === "GBB" || a === "SERVICOM" || a === "NEXIM" || a === "BOI" || a === "SEC";
+  return a === "NCC" || a === "GBB" || a === "SERVICOM" || a === "NEXIM" || a === "BOI" || a === "SEC" || a === "NESREA";
 }
 
 export function mdaHasPartialActivityScoring(mda: { abbreviation?: string | null }): boolean {
@@ -33,6 +33,9 @@ export function reformCountsTowardMdaScore(
     return refNumber !== 3 && refNumber !== 6;
   }
   if (mda.abbreviation === "SEC") {
+    return refNumber !== 4;
+  }
+  if (mda.abbreviation === "NESREA") {
     return refNumber !== 4;
   }
   return true;
