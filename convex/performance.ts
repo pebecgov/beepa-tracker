@@ -554,7 +554,10 @@ export const getProgressHistory = query({
 
       const periodEndTimestamp =
         cycleStart + period.end * DAY_MS - 1;
-      const cutoffTimestamp = Math.min(now, periodEndTimestamp);
+      // For the current period, always use `now` so scores updated after the
+      // nominal period end (e.g. past Day 90) are still reflected.
+      const cutoffTimestamp =
+        index === currentPeriodIndex ? now : Math.min(now, periodEndTimestamp);
       const currentSnapshot = calculateScoresAt(cutoffTimestamp);
 
       const previousByMda = new Map(

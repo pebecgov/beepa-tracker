@@ -30,7 +30,7 @@ export function reformCountsTowardMdaScore(
     return refNumber !== 6;
   }
   if (mda.abbreviation === "BOI") {
-    return refNumber !== 3 && refNumber !== 6;
+    return refNumber !== 3 && refNumber !== 4 && refNumber !== 6;
   }
   if (mda.abbreviation === "SEC") {
     return refNumber !== 4;

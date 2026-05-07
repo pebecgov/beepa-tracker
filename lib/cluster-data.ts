@@ -16,7 +16,7 @@ export const CLUSTERS: Cluster[] = [
         id: "transport-logistics",
         name: "Transport & Logistics Services Coordination Committee",
         meetingTime: "Monday 2/2/26 – 2:00pm",
-        lead: "Oluwaseun Winsala",
+        lead: "Summaiyah Yusuf",
         members: [
             { name: "Federal Airports Authority of Nigeria (FAAN)" },
             { name: "Federal Road Safety Corps (FRSC)" },
@@ -46,7 +46,7 @@ export const CLUSTERS: Cluster[] = [
         members: [
             { name: "Bureau for Public Procurement (BPP)" },
             { name: "National Bureau of Statistics (NBS)" },
-            { name: "Citizenship and Business Development Department (Ministry of Interior)" },
+            { name: "Ministry of Interior - Citizenship and Business Development Department (CBDD)" },
             { name: "Corporate Affairs Commission (CAC)" },
             { name: "EFCC – Special Control Unit for Money Laundering (SCUML)" },
             { name: "Industrial Training Fund (ITF)" },
@@ -120,7 +120,7 @@ export const CLUSTERS: Cluster[] = [
         lead: "Aimeya Okphebholo",
         members: [
             { name: "Bank of Industry (BOI)" },
-            { name: "Central Bank of Nigeria – National Collateral Agency (CBN – NCR)" },
+            { name: "Central Bank of Nigeria – National Collateral Registry (CBN-NCR)" },
             { name: "National Insurance Commission (NAICOM)" },
             { name: "Nigerian Agricultural Insurance Corporation (NAIC)" },
             { name: "Nigerian Export-Import Bank (NEXIM)" },
