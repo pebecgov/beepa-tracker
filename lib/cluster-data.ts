@@ -16,7 +16,7 @@ export const CLUSTERS: Cluster[] = [
         id: "transport-logistics",
         name: "Transport & Logistics Services Coordination Committee",
         meetingTime: "Monday 2/2/26 – 2:00pm",
-        lead: "Sumayyah Yusuf",
+        lead: "Sumaiyyah Yusuf",
         members: [
             { name: "Federal Airports Authority of Nigeria (FAAN)" },
             { name: "Federal Road Safety Corps (FRSC)" },
@@ -29,7 +29,7 @@ export const CLUSTERS: Cluster[] = [
         id: "digital-infrastructure",
         name: "Digital Infrastructure and Data Governance Facilitation Committee",
         meetingTime: "Thursday 29/01/26 – 2:00pm",
-        lead: "Sumayyah Yusuf",
+        lead: "Sumaiyyah Yusuf",
         members: [
             { name: "Galaxy Backbone Limited (GBB)" },
             { name: "National Identity Management Commission (NIMC)" },
@@ -160,7 +160,7 @@ export const CLUSTERS: Cluster[] = [
         id: "product-standards",
         name: "Product Standards & Safety Services Coordination Committee",
         meetingTime: "Friday 30/01/26 – 12:00pm",
-        lead: "-",
+        lead: "Charles Wakji",
         members: [
             { name: "Environmental Health Council of Nigeria (EHCON)" },
             { name: "Federal Produce Inspection Service (FPIS)" },
