@@ -192,7 +192,7 @@ export default function MDAPage({ params }: MDAPageProps) {
                 </dl>
               </div>
             )}
-            {mdaHasPartialActivityScoring(mda) && reforms && reforms.length > 0 && (
+            {mda.abbreviation === "NIS" && reforms && reforms.length > 0 && (
               <div className="mb-3 rounded-lg border border-gray-200 bg-white/80 p-3 text-sm">
                 <p className="font-medium text-gray-800 mb-2">
                   Current scoring method (NIS)
