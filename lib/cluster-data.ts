@@ -120,7 +120,6 @@ export const CLUSTERS: Cluster[] = [
             { name: "Bank of Industry (BOI)" },
             { name: "Central Bank of Nigeria – National Collateral Registry (CBN-NCR)" },
             { name: "National Insurance Commission (NAICOM)" },
-            { name: "Nigerian Agricultural Insurance Corporation (NAIC)" },
             { name: "Nigerian Export-Import Bank (NEXIM)" },
             { name: "Securities and Exchange Commission (SEC)" },
         ],

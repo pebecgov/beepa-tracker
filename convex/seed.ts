@@ -57,7 +57,6 @@ const PEBEC_MDAS = [
   { name: "Bank of Industry", abbreviation: "BOI" },
   { name: "Central Bank of Nigeria – National Collateral Registry", abbreviation: "CBN-NCR" },
   { name: "National Insurance Commission", abbreviation: "NAICOM" },
-  { name: "Nigerian Agricultural Insurance Corporation", abbreviation: "NAIC" },
   { name: "Nigerian Export-Import Bank", abbreviation: "NEXIM" },
   { name: "Securities and Exchange Commission", abbreviation: "SEC" },
 
@@ -88,7 +87,7 @@ const PEBEC_MDAS = [
 ];
 
 // Total counts for reference
-export const TOTAL_MDAS = PEBEC_MDAS.length; // 61 MDAs
+export const TOTAL_MDAS = PEBEC_MDAS.length; // 60 MDAs
 export const TOTAL_REFORMS = BEEPA_REFORMS.length; // 7 reforms per MDA
 export const TOTAL_ACTIVITIES = BEEPA_REFORMS.reduce((sum, r) => sum + r.activities.length, 0); // 52 activities per MDA
 
