@@ -50,10 +50,8 @@ const PEBEC_MDAS = [
   { name: "Service Compact", abbreviation: "SERVICOM" },
 
   // Intellectual Property Services Harmonisation Committee
-  { name: "FMITI - Trademarks Registry", abbreviation: "CLTR" },
   { name: "National Office for Technology Acquisition and Promotion", abbreviation: "NOTAP" },
   { name: "Nigerian Copyright Commission", abbreviation: "NiCC" },
-  { name: "FMITI - Patent and Design Registry", abbreviation: "PDR" },
 
   // Business Finance & Risk Optimisation Committee
   { name: "Bank of Industry", abbreviation: "BOI" },

@@ -5,12 +5,17 @@
 
 export function mdaHasPartialReformScoring(mda: { abbreviation?: string | null }): boolean {
   const a = mda.abbreviation;
-  return a === "NCC" || a === "GBB" || a === "SERVICOM" || a === "NEXIM" || a === "BOI" || a === "SEC" || a === "NESREA" || a === "NITDA" || a === "REA";
+  return (
+    a === "NCC" || a === "GBB" || a === "SERVICOM" || a === "NEXIM" || a === "BOI" ||
+    a === "SEC" || a === "NESREA" || a === "NITDA" || a === "REA" ||
+    a === "NCAA" || a === "NUPRC" || a === "NMDPRA" || a === "NOTAP" ||
+    a === "NDPC" || a === "NIPC"
+  );
 }
 
 export function mdaHasPartialActivityScoring(mda: { abbreviation?: string | null }): boolean {
   const a = mda.abbreviation;
-  return a === "NIS" || a === "SERVICOM";
+  return a === "NIS" || a === "SERVICOM" || a === "NUPRC" || a === "NEXIM";
 }
 
 export function reformCountsTowardMdaScore(
@@ -27,13 +32,13 @@ export function reformCountsTowardMdaScore(
     return refNumber !== 3 && refNumber !== 4 && refNumber !== 5 && refNumber !== 6;
   }
   if (mda.abbreviation === "NEXIM") {
-    return refNumber !== 6;
+    return refNumber !== 3 && refNumber !== 6;
   }
   if (mda.abbreviation === "BOI") {
     return refNumber !== 3 && refNumber !== 4 && refNumber !== 6;
   }
   if (mda.abbreviation === "SEC") {
-    return refNumber !== 4;
+    return refNumber !== 4 && refNumber !== 6;
   }
   if (mda.abbreviation === "NESREA") {
     return refNumber !== 4;
@@ -42,6 +47,24 @@ export function reformCountsTowardMdaScore(
     return refNumber !== 4 && refNumber !== 6;
   }
   if (mda.abbreviation === "REA") {
+    return refNumber !== 6;
+  }
+  if (mda.abbreviation === "NCAA") {
+    return refNumber !== 3;
+  }
+  if (mda.abbreviation === "NUPRC") {
+    return refNumber !== 6;
+  }
+  if (mda.abbreviation === "NMDPRA") {
+    return refNumber !== 4 && refNumber !== 6;
+  }
+  if (mda.abbreviation === "NOTAP") {
+    return refNumber !== 4 && refNumber !== 6;
+  }
+  if (mda.abbreviation === "NDPC") {
+    return refNumber !== 6;
+  }
+  if (mda.abbreviation === "NIPC") {
     return refNumber !== 6;
   }
   return true;
@@ -66,6 +89,12 @@ export function activityCountsTowardMdaScore(
   }
   if (mda.abbreviation === "SERVICOM" && reformRefNumber === 2) {
     return activityRefNumber !== "2.9" && activityRefNumber !== "2.10";
+  }
+  if (mda.abbreviation === "NUPRC" && reformRefNumber === 4) {
+    return activityRefNumber !== "4.2" && activityRefNumber !== "4.4";
+  }
+  if (mda.abbreviation === "NEXIM" && reformRefNumber === 7) {
+    return activityRefNumber !== "7.2";
   }
   return true;
 }

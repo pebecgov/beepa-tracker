@@ -107,10 +107,8 @@ export const CLUSTERS: Cluster[] = [
         meetingTime: "Thursday 29/01/26 – 3:00pm",
         lead: "Jaafar Shuaibu",
         members: [
-            { name: "FMITI - Trademarks Registry (CLTR)" },
             { name: "National Office for Technology Acquisition and Promotion" },
             { name: "Nigerian Copyright Commission (NiCC)" },
-            { name: "FMITI - Patent and Design Registry (PDR)" },
         ],
     },
     {
