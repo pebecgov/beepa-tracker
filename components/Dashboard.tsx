@@ -49,6 +49,7 @@ export function Dashboard() {
   const clearDb = useMutation(api.seed.clearDatabase);
   const migrateReform7 = useMutation(api.seed.migrateReform7);
   const syncFramework = useMutation(api.seed.syncFramework);
+  const removeMDA = useMutation(api.mdas.remove);
   const frameworkSyncStatus = useQuery(api.seed.checkFrameworkSync);
 
   // Auto-initialize database if empty
@@ -150,6 +151,16 @@ export function Dashboard() {
 
   const handleMDAClick = (mda: MDAPerformance) => {
     router.push(`/mda/${mda.mda._id}`);
+  };
+
+  const handleDeleteMDA = async (mda: MDAPerformance) => {
+    if (!confirm(`Delete "${mda.mda.name}" and all its reforms/activities? This cannot be undone.`)) return;
+    try {
+      await removeMDA({ id: mda.mda._id });
+      toast.success(`"${mda.mda.name}" deleted`);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to delete MDA");
+    }
   };
 
   // Show role selection for new users

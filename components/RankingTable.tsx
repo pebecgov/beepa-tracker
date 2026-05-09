@@ -5,13 +5,15 @@ import { StatusBadge } from "./ui/StatusBadge";
 import { ProgressBar } from "./ui/ProgressBar";
 import { RankBadge } from "./ui/RankBadge";
 import { formatScore, getRankSuffix } from "@/lib/utils";
+import { Trash2 } from "lucide-react";
 
 interface RankingTableProps {
   rankings: MDAPerformance[];
   onRowClick?: (mda: MDAPerformance) => void;
+  onDelete?: (mda: MDAPerformance) => void;
 }
 
-export function RankingTable({ rankings, onRowClick }: RankingTableProps) {
+export function RankingTable({ rankings, onRowClick, onDelete }: RankingTableProps) {
   if (rankings.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 p-8 text-center">
@@ -47,6 +49,7 @@ export function RankingTable({ rankings, onRowClick }: RankingTableProps) {
               <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider">
                 Reforms
               </th>
+              {onDelete && <th className="px-6 py-4" />}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -83,6 +86,20 @@ export function RankingTable({ rankings, onRowClick }: RankingTableProps) {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {item.reformCount}
                 </td>
+                {onDelete && (
+                  <td className="px-6 py-4 whitespace-nowrap text-right">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(item);
+                      }}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                      title="Delete MDA"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

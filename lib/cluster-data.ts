@@ -139,7 +139,7 @@ export const CLUSTERS: Cluster[] = [
         id: "ports-customs",
         name: "Ports and Customs Efficiency Committee",
         meetingTime: "Thursday 29/01/26 11:00am",
-        lead: "Jude Okala",
+        lead: "Charles Wakji",
         members: [
             { name: "National Drug Law Enforcement Agency (NDLEA)" },
             { name: "National Inland Waterways Authority (NIWA)" },
