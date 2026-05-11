@@ -150,7 +150,7 @@ export const CLUSTERS: Cluster[] = [
             { name: "Nigerian Maritime Administration and Safety Agency (NIMASA)" },
             { name: "Nigerian Ports Authority (NPA)" },
             { name: "Nigerian Shippers’ Council (NSC)" },
-            { name: "Ports Health Authority" },
+            { name: "Port Health (Quarantine) Services (PHA)" },
         ],
     },
     {
