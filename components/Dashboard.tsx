@@ -194,19 +194,19 @@ export function Dashboard() {
                   >
                     Manage Users
                   </Link>
-                  <button
+                  {/* <button
                     onClick={handleSeed}
                     className="px-4 py-2 text-sm font-medium text-[#006B3F] bg-white border border-white/20 rounded-lg hover:bg-green-50 transition-colors shadow-md"
                   >
                     Seed Data
-                  </button>
-                  <button
+                  </button> */}
+                  {/* <button
                     onClick={handleClear}
                     className="px-4 py-2 text-sm font-medium text-white bg-white/10 border border-white/30 rounded-lg hover:bg-white/20 transition-colors"
                   >
                     Clear Data
-                  </button>
-                  <button
+                  </button> */}
+                  {/* <button
                     onClick={handleSyncFramework}
                     className={`px-4 py-2 text-sm font-medium border rounded-lg transition-colors ${
                       frameworkSyncStatus?.needsSync
@@ -216,8 +216,8 @@ export function Dashboard() {
                     title={frameworkSyncStatus?.needsSync ? `Framework update available: ${frameworkSyncStatus.currentVersion} → ${frameworkSyncStatus.frameworkVersion}` : "Sync framework"}
                   >
                     {frameworkSyncStatus?.needsSync ? "⚠ Sync Framework" : "Sync Framework"}
-                  </button>
-                  <button
+                  </button> */}
+                  {/* <button
                     onClick={handleMigrateReform7}
                     className="px-4 py-2 text-sm font-medium text-white bg-white/10 border border-white/30 rounded-lg hover:bg-white/20 transition-colors"
                   >
@@ -228,7 +228,7 @@ export function Dashboard() {
                     className="px-4 py-2 text-sm font-medium text-white bg-[#006B3F] border border-white/20 rounded-lg hover:bg-[#005432] transition-colors shadow-md"
                   >
                     Sync MDAs
-                  </button>
+                  </button> */}
                 </>
               )}
               {isSignedIn ? (
