@@ -74,7 +74,7 @@ const PEBEC_MDAS = [
   { name: "Nigerian Maritime Administration and Safety Agency", abbreviation: "NIMASA" },
   { name: "Nigerian Ports Authority", abbreviation: "NPA" },
   { name: "Nigerian Shippers Council", abbreviation: "NSC" },
-  { name: "Ports Health Authority", abbreviation: "PHA" },
+  { name: "Port Health (Quarantine) Services", abbreviation: "PHA" },
 
   // Product Standards & Safety Services Coordination Committee
   { name: "Environmental Health Council of Nigeria", abbreviation: "EHCON" },
@@ -347,6 +347,7 @@ export const syncFramework = mutation({
   handler: async (ctx) => {
     const now = Date.now();
     let mdasCreated = 0;
+    let mdasUpdated = 0;
     let reformsCreated = 0;
     let activitiesCreated = 0;
     let activitiesUpdated = 0;
@@ -359,11 +360,18 @@ export const syncFramework = mutation({
 
     // Get all existing MDAs
     const existingMDAs = await ctx.db.query("mdas").collect();
-    const mdaMap = new Map(existingMDAs.map(m => [m.name, m]));
+    const mdaByName = new Map(existingMDAs.map(m => [m.name, m]));
+    const mdaByAbbreviation = new Map(
+      existingMDAs
+        .filter((m) => m.abbreviation)
+        .map((m) => [m.abbreviation!, m])
+    );
 
     // Sync MDAs
     for (const mdaInfo of PEBEC_MDAS) {
-      let mda = mdaMap.get(mdaInfo.name);
+      let mda =
+        mdaByAbbreviation.get(mdaInfo.abbreviation) ||
+        mdaByName.get(mdaInfo.name);
       if (!mda) {
         const mdaId = await ctx.db.insert("mdas", {
           name: mdaInfo.name,
@@ -375,6 +383,22 @@ export const syncFramework = mutation({
         if (!newMda) throw new Error("Failed to create MDA");
         mda = newMda as unknown as typeof mda;
         mdasCreated++;
+      } else if (
+        mda.name !== mdaInfo.name ||
+        mda.abbreviation !== mdaInfo.abbreviation
+      ) {
+        await ctx.db.patch(mda._id, {
+          name: mdaInfo.name,
+          abbreviation: mdaInfo.abbreviation,
+          updatedAt: now,
+        });
+        mda = {
+          ...mda,
+          name: mdaInfo.name,
+          abbreviation: mdaInfo.abbreviation,
+          updatedAt: now,
+        };
+        mdasUpdated++;
       }
 
       // Get existing reforms for this MDA
@@ -467,6 +491,7 @@ export const syncFramework = mutation({
       message: `Framework synced to version ${FRAMEWORK_VERSION}`,
       stats: {
         mdasCreated,
+        mdasUpdated,
         reformsCreated,
         activitiesCreated,
         activitiesUpdated,

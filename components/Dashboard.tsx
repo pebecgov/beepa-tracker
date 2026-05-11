@@ -138,7 +138,8 @@ export function Dashboard() {
       const result = await syncFramework();
       toast.success(
         `Framework synced! ` +
-        `Created: ${result.stats.mdasCreated} MDAs, ${result.stats.reformsCreated} reforms, ${result.stats.activitiesCreated} activities. ` +
+        `Created: ${result.stats.mdasCreated} MDAs, updated ${result.stats.mdasUpdated} MDAs, ` +
+        `${result.stats.reformsCreated} reforms, ${result.stats.activitiesCreated} activities. ` +
         `Updated: ${result.stats.activitiesUpdated} activities. ` +
         `Deleted: ${result.stats.activitiesDeleted} obsolete activities.`
       );
@@ -217,7 +218,7 @@ export function Dashboard() {
                   >
                     {frameworkSyncStatus?.needsSync ? "⚠ Sync Framework" : "Sync Framework"}
                   </button> */}
-                  {/* <button
+                  <button
                     onClick={handleMigrateReform7}
                     className="px-4 py-2 text-sm font-medium text-white bg-white/10 border border-white/30 rounded-lg hover:bg-white/20 transition-colors"
                   >
@@ -228,7 +229,7 @@ export function Dashboard() {
                     className="px-4 py-2 text-sm font-medium text-white bg-[#006B3F] border border-white/20 rounded-lg hover:bg-[#005432] transition-colors shadow-md"
                   >
                     Sync MDAs
-                  </button> */}
+                  </button>
                 </>
               )}
               {isSignedIn ? (
