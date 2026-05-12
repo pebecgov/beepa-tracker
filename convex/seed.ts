@@ -55,7 +55,7 @@ const PEBEC_MDAS = [
 
   // Business Finance & Risk Optimisation Committee
   { name: "Bank of Industry", abbreviation: "BOI" },
-  { name: "Central Bank of Nigeria – National Collateral Registry", abbreviation: "CBN-NCR" },
+  { name: "Central Bank of Nigeria", abbreviation: "CBN" },
   { name: "National Insurance Commission", abbreviation: "NAICOM" },
   { name: "Nigerian Export-Import Bank", abbreviation: "NEXIM" },
   { name: "Securities and Exchange Commission", abbreviation: "SEC" },
@@ -372,6 +372,15 @@ export const syncFramework = mutation({
       let mda =
         mdaByAbbreviation.get(mdaInfo.abbreviation) ||
         mdaByName.get(mdaInfo.name);
+      // Legacy: National Collateral Registry listing merged into plain CBN
+      if (
+        !mda &&
+        mdaInfo.abbreviation === "CBN"
+      ) {
+        mda =
+          mdaByAbbreviation.get("CBN-NCR") ||
+          mdaByName.get("Central Bank of Nigeria – National Collateral Registry");
+      }
       if (!mda) {
         const mdaId = await ctx.db.insert("mdas", {
           name: mdaInfo.name,

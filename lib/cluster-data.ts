@@ -118,7 +118,7 @@ export const CLUSTERS: Cluster[] = [
         lead: "Aimeya Okphebholo",
         members: [
             { name: "Bank of Industry (BOI)" },
-            { name: "Central Bank of Nigeria – National Collateral Registry (CBN-NCR)" },
+            { name: "Central Bank of Nigeria (CBN)" },
             { name: "National Insurance Commission (NAICOM)" },
             { name: "Nigerian Export-Import Bank (NEXIM)" },
             { name: "Securities and Exchange Commission (SEC)" },

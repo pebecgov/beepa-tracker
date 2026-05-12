@@ -120,16 +120,42 @@ export const batchUpdateCompletion = mutation({
     ),
   },
   handler: async (ctx, args) => {
+    const { canEdit, userId } = await canUserEdit(ctx);
+    if (!canEdit || !userId) {
+      throw new Error("You don't have permission to update activities. You need an Editor or Admin role.");
+    }
+
     const now = Date.now();
 
     for (const update of args.updates) {
       const existing = await ctx.db.get(update.id);
       if (!existing) continue;
 
+      if (update.completionLevel < 0 || update.completionLevel > 1) {
+        throw new Error("Completion level must be between 0 and 1");
+      }
+
       await ctx.db.patch(update.id, {
         completionLevel: update.completionLevel,
         status: update.status,
+        lastUpdatedBy: userId,
         updatedAt: now,
+      });
+
+      await ctx.db.insert("auditLogs", {
+        entityType: "activity",
+        entityId: update.id,
+        action: "update",
+        previousValue: {
+          completionLevel: existing.completionLevel,
+          status: existing.status,
+        },
+        newValue: {
+          completionLevel: update.completionLevel,
+          status: update.status,
+        },
+        userId,
+        timestamp: now,
       });
     }
 

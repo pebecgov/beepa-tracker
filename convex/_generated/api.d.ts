@@ -9,6 +9,7 @@
  */
 
 import type * as activities from "../activities.js";
+import type * as auditLogs from "../auditLogs.js";
 import type * as beepaFramework from "../beepaFramework.js";
 import type * as mdas from "../mdas.js";
 import type * as performance from "../performance.js";
@@ -24,6 +25,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   activities: typeof activities;
+  auditLogs: typeof auditLogs;
   beepaFramework: typeof beepaFramework;
   mdas: typeof mdas;
   performance: typeof performance;
