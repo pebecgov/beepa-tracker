@@ -17,7 +17,6 @@ import { ActivityStatus, Status } from "@/lib/types";
 import { useAppUser } from "@/components/UserProvider";
 import {
   mdaHasPartialReformScoring,
-  mdaHasPartialActivityScoring,
   reformCountsTowardMdaScore,
   activityCountsTowardMdaScore,
 } from "@/lib/beepa-scoring";
@@ -29,6 +28,7 @@ interface MDAPageProps {
 export default function MDAPage({ params }: MDAPageProps) {
   const { id } = use(params);
   const mdaId = id as Id<"mdas">;
+  const { isAdmin } = useAppUser();
 
   const [expandedReform, setExpandedReform] = useState<Id<"reforms"> | null>(null);
 
@@ -87,6 +87,14 @@ export default function MDAPage({ params }: MDAPageProps) {
             </svg>
             Back to Dashboard
           </Link>
+          {isAdmin && (
+            <Link
+              href={`/mda/${mdaId}/scorecard`}
+              className="inline-flex items-center gap-2 px-4 py-2 mb-4 ml-3 text-sm font-medium text-[#006B3F] bg-white border border-[#006B3F]/30 rounded-lg hover:bg-[#006B3F]/5 transition-colors shadow-sm"
+            >
+              View Scorecard
+            </Link>
+          )}
 
           <div className="flex items-start justify-between">
             <div>
@@ -105,7 +113,7 @@ export default function MDAPage({ params }: MDAPageProps) {
             <StatusBadge status={status as Status} size="lg" />
           </div>
 
-          <div className="mt-6 bg-gradient-to-r from-gray-50 to-white rounded-xl p-4 border border-gray-200">
+          <div className="mt-6 bg-linear-to-r from-gray-50 to-white rounded-xl p-4 border border-gray-200">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-700">
                 Overall BEEPA Score (Applicable Reforms)

@@ -195,6 +195,12 @@ export function Dashboard() {
                   >
                     Manage Users
                   </Link>
+                  <Link
+                    href="/report"
+                    className="px-4 py-2 text-sm font-medium text-white bg-white/10 border border-white/30 rounded-lg hover:bg-white/20 transition-colors"
+                  >
+                    General Report
+                  </Link>
                   {/* <button
                     onClick={handleSeed}
                     className="px-4 py-2 text-sm font-medium text-[#006B3F] bg-white border border-white/20 rounded-lg hover:bg-green-50 transition-colors shadow-md"

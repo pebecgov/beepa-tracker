@@ -1,6 +1,7 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { reformCountsTowardMdaScore, activityCountsTowardMdaScore } from "../lib/beepa-scoring";
+import { CLUSTERS } from "../lib/cluster-data";
 
 // Status thresholds and labels (based on PEBEC standards)
 // Requires Intervention: 0-30%, Progressing With Difficulty: 31-49%, Progressing: 50-70%, Progressing Well: 71-89%, Successful: 90-100%
@@ -20,6 +21,39 @@ function getStatus(score: number): { label: string; color: string } {
     }
   }
   return STATUS_THRESHOLDS[STATUS_THRESHOLDS.length - 1];
+}
+
+function getScorecardTier(score: number): {
+  label: string;
+  description: string;
+  color: string;
+} {
+  if (score >= 0.95) {
+    return {
+      label: "Super MDA",
+      description: "Bonus-point level performance with near-complete implementation.",
+      color: "green",
+    };
+  }
+  if (score >= 0.75) {
+    return {
+      label: "Excellent",
+      description: "Strong implementation performance with limited outstanding gaps.",
+      color: "blue",
+    };
+  }
+  if (score >= 0.5) {
+    return {
+      label: "Moderate",
+      description: "Meaningful progress recorded, but delivery gaps remain.",
+      color: "yellow",
+    };
+  }
+  return {
+    label: "Lower Tier",
+    description: "Requires focused follow-up and implementation support.",
+    color: "red",
+  };
 }
 
 // Get reform performance (weighted score from activities)
@@ -68,6 +102,448 @@ export const getReformPerformance = query({
       activityCount: activities.length,
       completedCount,
       activities,
+    };
+  },
+});
+
+// Get admin report card for one MDA
+export const getMDAReportCard = query({
+  args: { mdaId: v.id("mdas") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const currentUser = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+
+    if (!currentUser || currentUser.role !== "admin") return null;
+
+    const mda = await ctx.db.get(args.mdaId);
+    if (!mda) throw new Error("MDA not found");
+
+    const reforms = await ctx.db
+      .query("reforms")
+      .withIndex("by_mda", (q) => q.eq("mdaId", args.mdaId))
+      .collect();
+
+    const reformRows = await Promise.all(
+      reforms.map(async (reform) => {
+        const activities = await ctx.db
+          .query("activities")
+          .withIndex("by_reform", (q) => q.eq("reformId", reform._id))
+          .collect();
+
+        const sortedActivities = [...activities].sort((a, b) => {
+          const aNum = parseFloat(a.refNumber.split(".")[1] || "0");
+          const bNum = parseFloat(b.refNumber.split(".")[1] || "0");
+          return aNum - bNum;
+        });
+
+        const countsTowardOverall = reformCountsTowardMdaScore(mda, reform.refNumber);
+        const applicableActivities = sortedActivities.filter((activity) =>
+          activityCountsTowardMdaScore(mda, reform.refNumber, activity.refNumber)
+        );
+
+        const totalApplicableWeight = applicableActivities.reduce(
+          (sum, activity) => sum + activity.weight,
+          0
+        );
+        const weightedScore = applicableActivities.reduce(
+          (sum, activity) => sum + activity.completionLevel * activity.weight,
+          0
+        );
+        const score = totalApplicableWeight > 0 ? weightedScore / totalApplicableWeight : 0;
+        const completedCount = applicableActivities.filter(
+          (activity) => activity.status === "complete"
+        ).length;
+        const inProgressCount = applicableActivities.filter(
+          (activity) => activity.status === "in_progress"
+        ).length;
+        const notStartedCount = applicableActivities.filter(
+          (activity) => activity.status === "not_started"
+        ).length;
+        const excludedActivities = sortedActivities.filter(
+          (activity) =>
+            !activityCountsTowardMdaScore(mda, reform.refNumber, activity.refNumber)
+        );
+
+        return {
+          reform,
+          score,
+          status: getStatus(score),
+          countsTowardOverall,
+          activityCount: sortedActivities.length,
+          applicableActivityCount: applicableActivities.length,
+          completedCount,
+          inProgressCount,
+          notStartedCount,
+          excludedActivityCount: excludedActivities.length,
+          activities: sortedActivities.map((activity) => ({
+            _id: activity._id,
+            refNumber: activity.refNumber,
+            name: activity.name,
+            weight: activity.weight,
+            completionLevel: activity.completionLevel,
+            status: activity.status,
+            countsTowardScore: activityCountsTowardMdaScore(
+              mda,
+              reform.refNumber,
+              activity.refNumber
+            ),
+            updatedAt: activity.updatedAt,
+          })),
+        };
+      })
+    );
+
+    reformRows.sort((a, b) => a.reform.refNumber - b.reform.refNumber);
+
+    const scoringReforms = reformRows.filter((row) => row.countsTowardOverall);
+    const score =
+      scoringReforms.length === 0
+        ? 0
+        : scoringReforms.reduce((sum, row) => sum + row.score, 0) /
+          scoringReforms.length;
+
+    const totalApplicableActivities = scoringReforms.reduce(
+      (sum, row) => sum + row.applicableActivityCount,
+      0
+    );
+    const completedActivities = scoringReforms.reduce(
+      (sum, row) => sum + row.completedCount,
+      0
+    );
+    const inProgressActivities = scoringReforms.reduce(
+      (sum, row) => sum + row.inProgressCount,
+      0
+    );
+    const notStartedActivities = scoringReforms.reduce(
+      (sum, row) => sum + row.notStartedCount,
+      0
+    );
+    const excludedReformCount = reformRows.filter((row) => !row.countsTowardOverall).length;
+    const excludedActivityCount = reformRows.reduce(
+      (sum, row) => sum + row.excludedActivityCount,
+      0
+    );
+    const weakestReforms = scoringReforms
+      .filter((row) => row.score < 0.75)
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 3)
+      .map((row) => ({
+        refNumber: row.reform.refNumber,
+        name: row.reform.name,
+        score: row.score,
+      }));
+
+    return {
+      mda,
+      score,
+      status: getStatus(score),
+      tier: getScorecardTier(score),
+      generatedAt: Date.now(),
+      summary: {
+        reformCount: reformRows.length,
+        scoringReformCount: scoringReforms.length,
+        excludedReformCount,
+        totalApplicableActivities,
+        completedActivities,
+        inProgressActivities,
+        notStartedActivities,
+        excludedActivityCount,
+        completionRate:
+          totalApplicableActivities === 0
+            ? 0
+            : completedActivities / totalApplicableActivities,
+      },
+      reformRows,
+      weakestReforms,
+    };
+  },
+});
+
+// Get admin-only general BEEPA report
+export const getGeneralReport = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const currentUser = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+
+    if (!currentUser || currentUser.role !== "admin") return null;
+
+    const [mdas, reforms, activities] = await Promise.all([
+      ctx.db.query("mdas").collect(),
+      ctx.db.query("reforms").collect(),
+      ctx.db.query("activities").collect(),
+    ]);
+
+    const reformsByMda = new Map<string, typeof reforms>();
+    for (const reform of reforms) {
+      const existing = reformsByMda.get(reform.mdaId) || [];
+      existing.push(reform);
+      reformsByMda.set(reform.mdaId, existing);
+    }
+
+    const activitiesByReform = new Map<string, typeof activities>();
+    for (const activity of activities) {
+      const existing = activitiesByReform.get(activity.reformId) || [];
+      existing.push(activity);
+      activitiesByReform.set(activity.reformId, existing);
+    }
+
+    const getReformScore = (
+      mda: (typeof mdas)[number],
+      reform: (typeof reforms)[number]
+    ) => {
+      const reformActivities = activitiesByReform.get(reform._id) || [];
+      const applicableActivities = reformActivities.filter((activity) =>
+        activityCountsTowardMdaScore(mda, reform.refNumber, activity.refNumber)
+      );
+      const totalApplicableWeight = applicableActivities.reduce(
+        (sum, activity) => sum + activity.weight,
+        0
+      );
+      const weightedScore = applicableActivities.reduce(
+        (sum, activity) => sum + activity.completionLevel * activity.weight,
+        0
+      );
+
+      return {
+        score: totalApplicableWeight > 0 ? weightedScore / totalApplicableWeight : 0,
+        activityCount: applicableActivities.length,
+        completedCount: applicableActivities.filter((activity) => activity.status === "complete").length,
+        inProgressCount: applicableActivities.filter((activity) => activity.status === "in_progress").length,
+        notStartedCount: applicableActivities.filter((activity) => activity.status === "not_started").length,
+      };
+    };
+
+    const mdaPerformances = mdas.map((mda) => {
+      const mdaReforms = (reformsByMda.get(mda._id) || []).sort(
+        (a, b) => a.refNumber - b.refNumber
+      );
+      const reformRows = mdaReforms.map((reform) => {
+        const scoreData = getReformScore(mda, reform);
+        return {
+          refNumber: reform.refNumber,
+          name: reform.name,
+          countsTowardOverall: reformCountsTowardMdaScore(mda, reform.refNumber),
+          ...scoreData,
+        };
+      });
+      const scoringReforms = reformRows.filter((row) => row.countsTowardOverall);
+      const score =
+        scoringReforms.length === 0
+          ? 0
+          : scoringReforms.reduce((sum, row) => sum + row.score, 0) /
+            scoringReforms.length;
+      const activityCount = scoringReforms.reduce((sum, row) => sum + row.activityCount, 0);
+      const completedCount = scoringReforms.reduce((sum, row) => sum + row.completedCount, 0);
+
+      return {
+        mda: {
+          _id: mda._id,
+          name: mda.name,
+          abbreviation: mda.abbreviation ?? null,
+        },
+        score,
+        status: getStatus(score),
+        tier: getScorecardTier(score),
+        reformCount: mdaReforms.length,
+        scoringReformCount: scoringReforms.length,
+        activityCount,
+        completedCount,
+        completionRate: activityCount === 0 ? 0 : completedCount / activityCount,
+        reformRows,
+      };
+    });
+
+    const rankedMDAs = [...mdaPerformances].sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.mda.name.localeCompare(b.mda.name);
+    });
+
+    const reformMap = new Map<
+      number,
+      {
+        refNumber: number;
+        name: string;
+        applicableMdaCount: number;
+        completedMdaCount: number;
+        startedMdaCount: number;
+        totalScore: number;
+        mdasNotDone: Array<{
+          name: string;
+          abbreviation: string | null;
+          score: number;
+          status: string;
+        }>;
+      }
+    >();
+
+    for (const performance of mdaPerformances) {
+      for (const reform of performance.reformRows) {
+        if (!reform.countsTowardOverall) continue;
+
+        const existing =
+          reformMap.get(reform.refNumber) ||
+          {
+            refNumber: reform.refNumber,
+            name: reform.name,
+            applicableMdaCount: 0,
+            completedMdaCount: 0,
+            startedMdaCount: 0,
+            totalScore: 0,
+            mdasNotDone: [],
+          };
+
+        existing.applicableMdaCount++;
+        existing.totalScore += reform.score;
+        if (reform.score >= 0.999) existing.completedMdaCount++;
+        if (reform.score > 0) existing.startedMdaCount++;
+        if (reform.score < 0.999) {
+          existing.mdasNotDone.push({
+            name: performance.mda.name,
+            abbreviation: performance.mda.abbreviation,
+            score: reform.score,
+            status: reform.score === 0 ? "Not Started" : "In Progress",
+          });
+        }
+
+        reformMap.set(reform.refNumber, existing);
+      }
+    }
+
+    const reformAnalysis = [...reformMap.values()]
+      .map((reform) => ({
+        ...reform,
+        completionRate:
+          reform.applicableMdaCount === 0
+            ? 0
+            : reform.completedMdaCount / reform.applicableMdaCount,
+        startedRate:
+          reform.applicableMdaCount === 0
+            ? 0
+            : reform.startedMdaCount / reform.applicableMdaCount,
+        averageScore:
+          reform.applicableMdaCount === 0
+            ? 0
+            : reform.totalScore / reform.applicableMdaCount,
+        mdasNotDone: reform.mdasNotDone.sort((a, b) => a.score - b.score),
+      }))
+      .sort((a, b) => a.refNumber - b.refNumber);
+
+    const reformsDoneFirst = [...reformAnalysis]
+      .sort((a, b) => {
+        if (b.completionRate !== a.completionRate) return b.completionRate - a.completionRate;
+        return b.averageScore - a.averageScore;
+      })
+      .slice(0, 5);
+
+    const leastCompletedReforms = [...reformAnalysis]
+      .sort((a, b) => {
+        if (a.completionRate !== b.completionRate) return a.completionRate - b.completionRate;
+        return a.averageScore - b.averageScore;
+      })
+      .slice(0, 5);
+
+    const statusOrder = [
+      "Successful",
+      "Progressing Well",
+      "In Progress",
+      "Progressing With Difficulty",
+      "Requires Intervention",
+    ];
+    const mdasByStatus = statusOrder.map((label) => ({
+      label,
+      mdas: rankedMDAs.filter((performance) => performance.status.label === label),
+    }));
+
+    const tierOrder = ["Super MDA", "Excellent", "Moderate", "Lower Tier"];
+    const mdasByTier = tierOrder.map((label) => ({
+      label,
+      mdas: rankedMDAs.filter((performance) => performance.tier.label === label),
+    }));
+
+    const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const getClusterMemberPerformance = (clusterMdaName: string) => {
+      const bracketMatch = clusterMdaName.match(/\(([^)]+)\)\s*$/);
+      const clusterAbbreviation = bracketMatch ? normalize(bracketMatch[1]) : null;
+      const clusterBaseName = normalize(clusterMdaName.replace(/\s*\([^)]+\)\s*$/, ""));
+
+      return mdaPerformances.find((performance) => {
+        const mdaName = normalize(performance.mda.name);
+        const mdaAbbreviation = performance.mda.abbreviation
+          ? normalize(performance.mda.abbreviation)
+          : null;
+
+        return (
+          mdaName === clusterBaseName ||
+          (clusterAbbreviation !== null && clusterAbbreviation === mdaAbbreviation) ||
+          mdaName === normalize(clusterMdaName)
+        );
+      });
+    };
+
+    const clusterPerformance = CLUSTERS.map((cluster) => {
+      const members = cluster.members.map((member) => ({
+        name: member.name,
+        performance: getClusterMemberPerformance(member.name) || null,
+      }));
+      const membersWithData = members.filter((member) => member.performance !== null);
+      const score =
+        membersWithData.length === 0
+          ? 0
+          : membersWithData.reduce((sum, member) => sum + member.performance!.score, 0) /
+            membersWithData.length;
+
+      return {
+        id: cluster.id,
+        name: cluster.name,
+        lead: cluster.lead,
+        score,
+        status: getStatus(score),
+        mdaCount: cluster.members.length,
+        matchedMdaCount: membersWithData.length,
+        members,
+      };
+    }).sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return a.name.localeCompare(b.name);
+    });
+
+    const overallScore =
+      mdaPerformances.length === 0
+        ? 0
+        : mdaPerformances.reduce((sum, performance) => sum + performance.score, 0) /
+          mdaPerformances.length;
+
+    return {
+      generatedAt: Date.now(),
+      summary: {
+        totalMDAs: mdaPerformances.length,
+        totalReforms: reforms.length,
+        totalActivities: activities.length,
+        overallScore,
+        overallStatus: getStatus(overallScore),
+        topMDA: rankedMDAs[0] ?? null,
+        lowestCluster: clusterPerformance[clusterPerformance.length - 1] ?? null,
+      },
+      top10MDAs: rankedMDAs.slice(0, 10).map((performance, index) => ({
+        ...performance,
+        rank: index + 1,
+      })),
+      reformsDoneFirst,
+      leastCompletedReforms,
+      mdasByStatus,
+      mdasByTier,
+      clusterPerformance,
     };
   },
 });
