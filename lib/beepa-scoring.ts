@@ -9,7 +9,8 @@ export function mdaHasPartialReformScoring(mda: { abbreviation?: string | null }
     a === "NCC" || a === "GBB" || a === "SERVICOM" || a === "NEXIM" || a === "BOI" ||
     a === "SEC" || a === "NESREA" || a === "NITDA" || a === "REA" ||
     a === "NCAA" || a === "NUPRC" || a === "NMDPRA" || a === "NOTAP" ||
-    a === "NDPC" || a === "NIPC" || a === "SCUML" || a === "ITF" || a === "NBS"
+    a === "NDPC" || a === "NIPC" || a === "SCUML" || a === "ITF" || a === "NBS" ||
+    a === "NERC"
   );
 }
 
@@ -75,6 +76,9 @@ export function reformCountsTowardMdaScore(
   }
   if (mda.abbreviation === "NBS") {
     return refNumber !== 6;
+  }
+  if (mda.abbreviation === "NERC") {
+    return refNumber !== 3 && refNumber !== 6;
   }
   return true;
 }
