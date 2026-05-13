@@ -88,6 +88,8 @@ export function reformCountsTowardMdaScore(
  * NIS Reform 6: excludes activities 6.6 and 6.7.
  * SERVICOM Reform 7: excludes activity 7.2.
  * SERVICOM Reform 2: excludes activities 2.9 and 2.10.
+ * NUPRC Reform 4: excludes activities 4.2 and 4.4.
+ * NERC Reform 4: excludes activities 4.3, 4.4, and 4.5.
  */
 export function activityCountsTowardMdaScore(
   mda: { abbreviation?: string | null },
@@ -105,6 +107,9 @@ export function activityCountsTowardMdaScore(
   }
   if (mda.abbreviation === "NUPRC" && reformRefNumber === 4) {
     return activityRefNumber !== "4.2" && activityRefNumber !== "4.4";
+  }
+  if (mda.abbreviation === "NERC" && reformRefNumber === 4) {
+    return activityRefNumber !== "4.3" && activityRefNumber !== "4.4" && activityRefNumber !== "4.5";
   }
   if (mda.abbreviation === "NEXIM" && reformRefNumber === 7) {
     return activityRefNumber !== "7.2";
