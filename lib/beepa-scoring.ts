@@ -78,7 +78,7 @@ export function reformCountsTowardMdaScore(
     return refNumber !== 6;
   }
   if (mda.abbreviation === "NERC") {
-    return refNumber !== 3 && refNumber !== 6;
+    return refNumber !== 6;
   }
   return true;
 }
