@@ -323,7 +323,13 @@ export default function MDAPage({ params }: MDAPageProps) {
                         {formatScore(reformPerf.score)}
                       </span>
                       <span className="text-sm text-gray-500">
-                        {reformPerf.completedCount}/{reformPerf.activityCount} activities
+                        {reformPerf.completedCount}/{reformPerf.activityCount} scoring activities
+                        {(reformPerf.exemptActivityCount ?? 0) > 0 ? (
+                          <span className="text-amber-800 font-medium">
+                            {" "}
+                            · {reformPerf.exemptActivityCount} exempt
+                          </span>
+                        ) : null}
                       </span>
                     </div>
                   </div>
@@ -406,6 +412,15 @@ function ActivitiesList({
     return aNum - bNum;
   });
 
+  const activityCountsTowardScore = (refNumber: string) =>
+    mda && reformRefNumber !== undefined
+      ? activityCountsTowardMdaScore(mda, reformRefNumber, refNumber)
+      : true;
+
+  const applicableActivities = sortedActivities.filter((a) => activityCountsTowardScore(a.refNumber));
+  const exemptActivities = sortedActivities.filter((a) => !activityCountsTowardScore(a.refNumber));
+  const scoringActivitiesComplete = applicableActivities.filter((a) => a.status === "complete").length;
+
   return (
     <div className="border-t border-gray-200">
       {/* Header */}
@@ -419,10 +434,14 @@ function ActivitiesList({
 
       {/* Activities */}
       <div className="divide-y divide-gray-100">
-        {sortedActivities.map((activity) => (
+        {sortedActivities.map((activity) => {
+          const isExemptFromScore = !activityCountsTowardScore(activity.refNumber);
+          return (
           <div
             key={activity._id}
-            className="px-5 py-4 grid grid-cols-12 gap-4 items-center hover:bg-gray-50 transition-colors"
+            className={`px-5 py-4 grid grid-cols-12 gap-4 items-center hover:bg-gray-50 transition-colors ${
+              isExemptFromScore ? "bg-amber-50/70 border-l-4 border-amber-400" : ""
+            }`}
           >
             {/* Ref Number */}
             <div className="col-span-1">
@@ -434,10 +453,9 @@ function ActivitiesList({
             {/* Activity Name */}
             <div className="col-span-4">
               <p className="text-sm text-gray-900 leading-tight">{activity.name}</p>
-              {mda && reformRefNumber !== undefined &&
-                !activityCountsTowardMdaScore(mda, reformRefNumber, activity.refNumber) && (
-                  <span className="inline-flex items-center rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900 mt-1">
-                    Not included in score
+              {isExemptFromScore && (
+                  <span className="inline-flex items-center rounded-md bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-950 mt-1.5">
+                    Exempted — not counted in BEEPA score
                   </span>
               )}
             </div>
@@ -496,15 +514,22 @@ function ActivitiesList({
               )}
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Summary */}
       <div className="px-5 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-sm">
         <div className="flex items-center gap-4">
           <span className="text-gray-500">
-            {sortedActivities.filter((a) => a.status === "complete").length} of{" "}
-            {sortedActivities.length} activities complete
+            {scoringActivitiesComplete} of {applicableActivities.length} scoring activities complete
+            {exemptActivities.length > 0 ? (
+              <span className="text-amber-950 font-medium">
+                {" "}
+                ({exemptActivities.length} exempt{": "}
+                {exemptActivities.map((a) => a.refNumber).join(", ")})
+              </span>
+            ) : null}
           </span>
           {!canEdit && (
             <span className="text-gray-400 text-xs">

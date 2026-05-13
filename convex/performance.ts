@@ -584,6 +584,7 @@ export const getMDAPerformance = query({
             score: 0,
             status: getStatus(0),
             activityCount: 0,
+            exemptActivityCount: 0,
             completedCount: 0,
           };
         }
@@ -592,9 +593,11 @@ export const getMDAPerformance = query({
         let weightedScore = 0;
         let totalApplicableWeight = 0;
         let completedCount = 0;
+        let applicableActivityCount = 0;
 
         for (const activity of activities) {
           if (!activityCountsTowardMdaScore(mda, reform.refNumber, activity.refNumber)) continue;
+          applicableActivityCount++;
           weightedScore += activity.completionLevel * activity.weight;
           totalApplicableWeight += activity.weight;
           if (activity.status === "complete") {
@@ -608,11 +611,14 @@ export const getMDAPerformance = query({
           status = { label: "In Progress", color: "yellow" };
         }
 
+        const exemptActivityCount = activities.length - applicableActivityCount;
+
         return {
           reform,
           score: normalizedScore,
           status,
-          activityCount: activities.length,
+          activityCount: applicableActivityCount,
+          exemptActivityCount,
           completedCount,
         };
       })
