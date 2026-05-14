@@ -160,6 +160,10 @@ export function downloadGeneralReportPDF(report: {
 
   // ── Top 10 ────────────────────────────────────────────────────────────────
   y = sectionHeading(doc, "Top 10 MDA Performance", y);
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7);
+  doc.setTextColor(...GRAY_MID);
+  y += 5;
   autoTable(doc, {
     startY: y,
     head: [["Rank", "MDA", "Abbreviation", "Score", "Status", "Tier"]],

@@ -179,7 +179,7 @@ export default function GeneralReportPage() {
           <div className="px-6 py-5 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900">Top 10 MDA Performance</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Ranking is based on applicable BEEPA reforms and approved exemptions.
+              Applicable reforms and exemptions apply. Equal scores: earlier settlement of scoring activities ranks higher (same tie-break as the dashboard leaderboard).
             </p>
           </div>
           <div className="divide-y divide-gray-100">
@@ -303,7 +303,7 @@ export default function GeneralReportPage() {
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900">General Scoring Tiers</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Admin view of MDAs by Super MDA, Excellent, Moderate, and Lower Tier.
+              Admin view: Super MDAs earned bonus points through qualifying submissions; other tiers follow BEEPA score only.
             </p>
             <div className="mt-5 space-y-4">
               {mdasByTier.map((group) => (

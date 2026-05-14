@@ -10,7 +10,7 @@ export function mdaHasPartialReformScoring(mda: { abbreviation?: string | null }
     a === "SEC" || a === "NESREA" || a === "NITDA" || a === "REA" ||
     a === "NCAA" || a === "NUPRC" || a === "NMDPRA" || a === "NOTAP" ||
     a === "NDPC" || a === "NIPC" || a === "SCUML" || a === "ITF" || a === "NBS" ||
-    a === "NERC"
+    a === "NERC" || a === "NEPZA"
   );
 }
 
@@ -80,6 +80,9 @@ export function reformCountsTowardMdaScore(
   if (mda.abbreviation === "NERC") {
     return refNumber !== 6;
   }
+  if (mda.abbreviation === "NEPZA") {
+    return refNumber !== 6;
+  }
   return true;
 }
 
@@ -115,4 +118,56 @@ export function activityCountsTowardMdaScore(
     return activityRefNumber !== "7.2";
   }
   return true;
+}
+
+/** Super MDAs: abbreviations that earned bonus points via submitted qualifying information; extend when instructed. */
+export const SUPER_MDA_BONUS_ABBREVIATIONS = ["NAQS", "NCS", "NAICOM", "NUPRC"] as const;
+
+export type ScorecardTier = {
+  label: string;
+  description: string;
+  color: string;
+};
+
+export function mdaHasSuperMdaBonus(mda: { abbreviation?: string | null }): boolean {
+  const a = mda.abbreviation?.trim();
+  if (!a) return false;
+  const upper = a.toUpperCase();
+  return (SUPER_MDA_BONUS_ABBREVIATIONS as readonly string[]).includes(upper);
+}
+
+/**
+ * Admin scorecard tiers: Super MDA only for agencies whose submissions earned bonus points; all others use score bands only.
+ */
+export function getScorecardTierForMda(
+  mda: { abbreviation?: string | null },
+  score: number
+): ScorecardTier {
+  if (mdaHasSuperMdaBonus(mda)) {
+    return {
+      label: "Super MDA",
+      description:
+        "Super MDA status from submitting qualifying information that earned programme bonus points. Other agencies are tiered only by BEEPA reform score.",
+      color: "green",
+    };
+  }
+  if (score >= 0.75) {
+    return {
+      label: "Excellent",
+      description: "Strong implementation performance with limited outstanding gaps.",
+      color: "blue",
+    };
+  }
+  if (score >= 0.5) {
+    return {
+      label: "Moderate",
+      description: "Meaningful progress recorded, but delivery gaps remain.",
+      color: "yellow",
+    };
+  }
+  return {
+    label: "Lower Tier",
+    description: "Requires focused follow-up and implementation support.",
+    color: "red",
+  };
 }

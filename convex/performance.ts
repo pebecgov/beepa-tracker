@@ -1,6 +1,10 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
-import { reformCountsTowardMdaScore, activityCountsTowardMdaScore } from "../lib/beepa-scoring";
+import {
+  reformCountsTowardMdaScore,
+  activityCountsTowardMdaScore,
+  getScorecardTierForMda,
+} from "../lib/beepa-scoring";
 import { CLUSTERS } from "../lib/cluster-data";
 
 // Status thresholds and labels (based on PEBEC standards)
@@ -21,39 +25,6 @@ function getStatus(score: number): { label: string; color: string } {
     }
   }
   return STATUS_THRESHOLDS[STATUS_THRESHOLDS.length - 1];
-}
-
-function getScorecardTier(score: number): {
-  label: string;
-  description: string;
-  color: string;
-} {
-  if (score >= 0.95) {
-    return {
-      label: "Super MDA",
-      description: "Bonus-point level performance with near-complete implementation.",
-      color: "green",
-    };
-  }
-  if (score >= 0.75) {
-    return {
-      label: "Excellent",
-      description: "Strong implementation performance with limited outstanding gaps.",
-      color: "blue",
-    };
-  }
-  if (score >= 0.5) {
-    return {
-      label: "Moderate",
-      description: "Meaningful progress recorded, but delivery gaps remain.",
-      color: "yellow",
-    };
-  }
-  return {
-    label: "Lower Tier",
-    description: "Requires focused follow-up and implementation support.",
-    color: "red",
-  };
 }
 
 // Get reform performance (weighted score from activities)
@@ -242,7 +213,7 @@ export const getMDAReportCard = query({
       mda,
       score,
       status: getStatus(score),
-      tier: getScorecardTier(score),
+      tier: getScorecardTierForMda(mda, score),
       generatedAt: Date.now(),
       summary: {
         reformCount: reformRows.length,
@@ -337,6 +308,20 @@ export const getGeneralReport = query({
           ...scoreData,
         };
       });
+
+      // Matches dashboard ranking tie-break (getRankedMDAs): max updatedAt among scoring activities
+      let lastApplicableActivityUpdate = 0;
+      for (const reform of mdaReforms) {
+        if (!reformCountsTowardMdaScore(mda, reform.refNumber)) continue;
+        const reformActivities = activitiesByReform.get(reform._id) || [];
+        for (const activity of reformActivities) {
+          if (!activityCountsTowardMdaScore(mda, reform.refNumber, activity.refNumber)) continue;
+          if (activity.updatedAt > lastApplicableActivityUpdate) {
+            lastApplicableActivityUpdate = activity.updatedAt;
+          }
+        }
+      }
+
       const scoringReforms = reformRows.filter((row) => row.countsTowardOverall);
       const score =
         scoringReforms.length === 0
@@ -354,18 +339,22 @@ export const getGeneralReport = query({
         },
         score,
         status: getStatus(score),
-        tier: getScorecardTier(score),
+        tier: getScorecardTierForMda(mda, score),
         reformCount: mdaReforms.length,
         scoringReformCount: scoringReforms.length,
         activityCount,
         completedCount,
         completionRate: activityCount === 0 ? 0 : completedCount / activityCount,
         reformRows,
+        lastApplicableActivityUpdate,
       };
     });
 
     const rankedMDAs = [...mdaPerformances].sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
+      const ta = a.lastApplicableActivityUpdate ?? 0;
+      const tb = b.lastApplicableActivityUpdate ?? 0;
+      if (ta !== tb) return ta - tb;
       return a.mda.name.localeCompare(b.mda.name);
     });
 
