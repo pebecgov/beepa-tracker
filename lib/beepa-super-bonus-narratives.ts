@@ -1,6 +1,6 @@
 /**
- * On-record bonus-point narratives for NAICOM (sole Super MDA on the programme roster).
- * Extend keyed entries when validated submissions change.
+ * Bonus-point narratives keyed by MDA abbreviation (shown only when that agency is on `SUPER_MDA_BONUS_ABBREVIATIONS`).
+ * Roster empty in code for now — entries kept for easy re-enable.
  */
 
 export type BonusSubmissionRow = {

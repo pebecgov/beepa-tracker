@@ -426,7 +426,7 @@ export const getGeneralReport = query({
     const isFirstBeepaCompleterAbbrev = (abbrev?: string | null) =>
       (abbrev || "").trim().toUpperCase() === firstCompleterUpper;
 
-    /** NAICOM (Super MDA) + ~100% score + not the first-completion milestone MDA (shown separately below). */
+    /** Super MDA roster + ~100% score + not first-completion milestone (row omitted when roster empty). */
     const exceptionalSuperMdasFullScore = rankedMDAs.filter(
       (p) =>
         mdaHasSuperMdaBonus({ abbreviation: p.mda.abbreviation }) &&

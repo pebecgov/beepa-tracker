@@ -199,13 +199,12 @@ export default function GeneralReportPage() {
         <section className="rounded-xl border border-amber-100 bg-amber-50/70 px-5 py-4 text-sm text-amber-950">
           <p className="font-semibold text-amber-900">How to read performance tiers</p>
           <p className="mt-1 text-amber-950/90">
-            Only <span className="font-semibold">NAICOM</span> is designated a Super MDA. At ~100% applicable tracker score with bonus submission evidence it appears under «{" "}
-            {EXCEPTIONAL_SUPER_MDA_TIER_LABEL} » (excluding the milestone-only row).
+            MDAs are grouped by weighted tracker score: Excellent 100% · Very Good 80–99% · Good 60–79% · Fair 50–59% · Poor
+            0–49%. Groupings are not a league table.
           </p>
           <p className="mt-2 text-amber-950/90">
-            <span className="font-semibold">{FIRST_BEEPA_COMPLETE_ABBREVIATION}</span> is listed separately under «{" "}
-            {FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL} » as the first MDA to complete the full BEEPA exercise — not a Super MDA designation. NAICOM below ~100% follows Excellent /
-            Very Good / … by score; all other MDAs use score-only bands. Groupings are not a league table.
+            <span className="font-semibold">{FIRST_BEEPA_COMPLETE_ABBREVIATION}</span> appears separately under «{" "}
+            {FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL} » as the first MDA recorded to complete the full BEEPA exercise.
           </p>
         </section>
 
@@ -221,19 +220,9 @@ export default function GeneralReportPage() {
             <p className="text-sm text-gray-600 mt-1">On the BEEPA reform tracker</p>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-xs uppercase tracking-wider text-gray-500">Exceptional MDAs</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{summary.exceptionalPerformanceCount}</p>
-            <p className="text-sm text-gray-600 mt-1">NAICOM at ~100% with bonus submission</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
             <p className="text-xs uppercase tracking-wider text-gray-500">Full implementation</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">{summary.fullImplementationCount}</p>
             <p className="text-sm text-gray-600 mt-1">MDAs at ~100% applicable reform score</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-xs uppercase tracking-wider text-gray-500">Super MDA on tracker</p>
-            <p className="text-3xl font-bold text-gray-900 mt-2">{summary.bonusEligibleOnTracker}</p>
-            <p className="text-sm text-gray-600 mt-1">NAICOM only (Super MDA)</p>
           </div>
         </section>
 

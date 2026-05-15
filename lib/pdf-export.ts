@@ -4,7 +4,11 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-import { generalReportMdaNameWithAbbrev, mdaHasSuperMdaBonus } from "./beepa-scoring";
+import {
+  FIRST_BEEPA_COMPLETE_ABBREVIATION,
+  generalReportMdaNameWithAbbrev,
+  mdaHasSuperMdaBonus,
+} from "./beepa-scoring";
 import { SUPER_MDA_BONUS_NARRATIVES, type SuperMdaBonusNarrative } from "./beepa-super-bonus-narratives";
 
 // ─── colours ────────────────────────────────────────────────────────────────
@@ -92,8 +96,6 @@ export function downloadGeneralReportPDF(report: {
     totalMDAs: number;
     overallScore: number;
     overallStatus: { label: string };
-    exceptionalPerformanceCount: number;
-    bonusEligibleOnTracker: number;
     fullImplementationCount: number;
   };
   mdasByPerformanceTier: Array<{
@@ -133,33 +135,13 @@ export function downloadGeneralReportPDF(report: {
 
   let y = 44;
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
-  doc.setTextColor(...GRAY_DARK);
-  const legendLines = doc.splitTextToSize(
-    "Performance tier score bands (weighted average of applicable reform activities): " +
-      "Excellent ≥99.5% · Very Good 80.0%–99.4% · Good 60.0%–79.9% · Fair 50.0%–59.9% · Poor below 50%. " +
-      "Rounded percentages in the tracker match standard rounding of these values.",
-    pw - 28
-  );
-  doc.text(legendLines, 14, y);
-  y += legendLines.length * 4 + 8;
-
   const stats = [
     { label: "Overall score", value: pct(report.summary.overallScore) },
     { label: "Status", value: report.summary.overallStatus.label },
     { label: "Total MDAs", value: String(report.summary.totalMDAs) },
     {
-      label: "Exceptional MDAs",
-      value: String(report.summary.exceptionalPerformanceCount),
-    },
-    {
       label: "Full implementation",
       value: String(report.summary.fullImplementationCount),
-    },
-    {
-      label: "Super MDA on tracker",
-      value: String(report.summary.bonusEligibleOnTracker),
     },
   ];
   const boxW = (pw - 28) / 3;
@@ -180,6 +162,41 @@ export function downloadGeneralReportPDF(report: {
     doc.text(stat.value, bx + 3, by + 12);
   });
   y += Math.ceil(stats.length / 3) * 20 + 8;
+
+  y = sectionHeading(doc, "MDAs by performance tier", y);
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7);
+  doc.setTextColor(...GRAY_MID);
+  const tierIntro = doc.splitTextToSize(
+    `${FIRST_BEEPA_COMPLETE_ABBREVIATION} appears alone under its dedicated milestone tier (below).`,
+    pw - 28
+  );
+  doc.text(tierIntro, 14, y);
+  y += tierIntro.length * 4 + 4;
+
+  for (const tierBlock of report.mdasByPerformanceTier) {
+    if (tierBlock.mdas.length === 0) continue;
+    y = sectionHeading(doc, tierBlock.label, y + 2);
+    autoTable(doc, {
+      startY: y,
+      head: [["MDA", "Score", "Status"]],
+      body: tierBlock.mdas.map((item) => [
+        generalReportMdaNameWithAbbrev(item.mda),
+        pct(item.score),
+        item.status.label,
+      ]),
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: {
+        0: { cellWidth: 88 },
+        1: { cellWidth: 22 },
+        2: { cellWidth: 56 },
+      },
+      margin: { left: 14, right: 14 },
+    });
+    y = (doc as any).lastAutoTable.finalY + 8;
+  }
 
   const seenBonusMda = new Set<string>();
   const bonusNarrativeBlocks: Array<{ name: string; abbrev: string; narrative: SuperMdaBonusNarrative }> = [];
@@ -284,8 +301,14 @@ export function downloadGeneralReportPDF(report: {
     didParseCell: (data) => {
       if (data.section === "head") {
         const idx = data.column.index;
-        if (idx === 4) data.cell.styles.fillColor = ONGOING_CELL_BG;
-        if (idx === 5) data.cell.styles.fillColor = EXEMPT_CELL_BG;
+        if (idx === 4) {
+          data.cell.styles.fillColor = ONGOING_CELL_BG;
+          data.cell.styles.textColor = GRAY_DARK;
+        }
+        if (idx === 5) {
+          data.cell.styles.fillColor = EXEMPT_CELL_BG;
+          data.cell.styles.textColor = GRAY_DARK;
+        }
         return;
       }
       if (data.section !== "body") return;

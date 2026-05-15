@@ -139,7 +139,8 @@ export const BEEPA_PROGRAMME_EXEMPTION_NOTES: readonly string[] = [
   "Nigeria Revenue Service (NRS): exemptions reflect ongoing national tax reform.",
 ];
 
-export const SUPER_MDA_BONUS_ABBREVIATIONS = ["NAICOM"] as const;
+/** Super MDA bonus roster (empty = no Super MDA tier active). Re-add abbreviations here when re-enabled. */
+export const SUPER_MDA_BONUS_ABBREVIATIONS = [] as const;
 
 export type ScorecardTier = {
   label: string;
@@ -147,11 +148,11 @@ export type ScorecardTier = {
   color: string;
 };
 
-/** NAICOM at ~100% with bonus submission evidence (general report exceptional tier; excludes milestone-only row). */
+/** Label for the exceptional Super MDA tier row (unused while `SUPER_MDA_BONUS_ABBREVIATIONS` is empty). */
 export const EXCEPTIONAL_SUPER_MDA_TIER_LABEL =
-  "Exceptional performance (NAICOM) — Submission of evidence for bonus point";
+  "Exceptional performance (Super MDA) — Submission of evidence for bonus point";
 
-/** Programme milestone row — first agency to complete BEEPA; not the NAICOM Super MDA designation. */
+/** Programme milestone row — first agency to complete BEEPA (separate from score bands). */
 export const FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL =
   "First BEEPA completion (programme milestone)";
 
@@ -199,8 +200,8 @@ export function scoreTierBandOnly(score: number): ScorecardTier {
 }
 
 /**
- * NAICOM Super MDA: exceptional tier when score ~100%; interim tier reflects tracker score until then.
- * All other MDAs: score bands Excellent → Poor only.
+ * MDAs on `SUPER_MDA_BONUS_ABBREVIATIONS`: exceptional tier labels when roster non-empty.
+ * Otherwise all MDAs use score bands Excellent → Poor only.
  */
 export function getScorecardTierForMda(
   mda: { abbreviation?: string | null },
