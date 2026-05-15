@@ -15,10 +15,11 @@ import { Status } from "@/lib/types";
 import {
   EXCEPTIONAL_SUPER_MDA_TIER_LABEL,
   generalReportMdaNameWithAbbrev,
-  mdaHasSuperMdaBonus,
 } from "@/lib/beepa-scoring";
-import type { SuperMdaBonusNarrative } from "@/lib/beepa-super-bonus-narratives";
-import { SUPER_MDA_BONUS_NARRATIVES } from "@/lib/beepa-super-bonus-narratives";
+import {
+  collectSuperMdaBonusNarrativeBlocks,
+  type SuperMdaBonusNarrative,
+} from "@/lib/beepa-super-bonus-narratives";
 import { formatDate, formatScore } from "@/lib/utils";
 import { downloadGeneralReportPDF } from "@/lib/pdf-export";
 
@@ -79,8 +80,9 @@ function BonusNarrativeCard({
             </tbody>
           </table>
         </div>
-      ) : narrative.bullets && narrative.bullets.length > 0 ? (
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
+      ) : null}
+      {narrative.bullets && narrative.bullets.length > 0 ? (
+        <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-gray-700">
           {narrative.bullets.map((b, i) => (
             <li key={i}>{b}</li>
           ))}
@@ -145,19 +147,7 @@ export default function GeneralReportPage() {
     exceptionProgramNotes,
   } = report;
 
-  const seenBonusMda = new Set<string>();
-  const bonusNarrativeBlocks: Array<{ abbrev: string; name: string; narrative: SuperMdaBonusNarrative }> = [];
-  for (const tierBlock of mdasByPerformanceTier) {
-    for (const item of tierBlock.mdas) {
-      if (!mdaHasSuperMdaBonus({ abbreviation: item.mda.abbreviation })) continue;
-      if (seenBonusMda.has(item.mda._id)) continue;
-      seenBonusMda.add(item.mda._id);
-      const abbrev = (item.mda.abbreviation || "").trim().toUpperCase();
-      const narrative = SUPER_MDA_BONUS_NARRATIVES[abbrev];
-      if (!narrative) continue;
-      bonusNarrativeBlocks.push({ abbrev: abbrev || item.mda.name, name: item.mda.name, narrative });
-    }
-  }
+  const bonusNarrativeBlocks = collectSuperMdaBonusNarrativeBlocks(mdasByPerformanceTier);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -280,9 +270,10 @@ export default function GeneralReportPage() {
 
         {bonusNarrativeBlocks.length > 0 && (
           <section className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900">NAICOM Super MDA — submission record</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Super MDA — regulatory simplification submissions</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Structured summary where NAICOM&apos;s validated bonus submission is on record.
+              NPA and NCS validated bonus-point claims under the BEEPA Weighted Reform Framework (regulatory
+              simplification cluster).
             </p>
             <div className="mt-6 space-y-4">
               {bonusNarrativeBlocks.map((block) => (

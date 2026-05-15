@@ -4,12 +4,8 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-import {
-  generalReportMdaNameWithAbbrev,
-  mdaHasSuperMdaBonus,
-  tierLabelWithPercentRange,
-} from "./beepa-scoring";
-import { SUPER_MDA_BONUS_NARRATIVES, type SuperMdaBonusNarrative } from "./beepa-super-bonus-narratives";
+import { generalReportMdaNameWithAbbrev, tierLabelWithPercentRange } from "./beepa-scoring";
+import { collectSuperMdaBonusNarrativeBlocks } from "./beepa-super-bonus-narratives";
 
 // ─── colours ────────────────────────────────────────────────────────────────
 const PEBEC_GREEN: [number, number, number] = [0, 107, 63];
@@ -269,37 +265,21 @@ export function downloadGeneralReportPDF(report: {
     y = (doc as any).lastAutoTable.finalY + 8;
   }
 
-  const seenBonusMda = new Set<string>();
-  const bonusNarrativeBlocks: Array<{ name: string; abbrev: string; narrative: SuperMdaBonusNarrative }> = [];
-  for (const tierBlock of report.mdasByPerformanceTier) {
-    for (const item of tierBlock.mdas) {
-      if (!mdaHasSuperMdaBonus({ abbreviation: item.mda.abbreviation })) continue;
-      if (seenBonusMda.has(item.mda._id)) continue;
-      seenBonusMda.add(item.mda._id);
-      const abbrev = (item.mda.abbreviation || "").trim().toUpperCase();
-      const narrative = SUPER_MDA_BONUS_NARRATIVES[abbrev];
-      if (!narrative) continue;
-      bonusNarrativeBlocks.push({
-        name: item.mda.name,
-        abbrev: abbrev || item.mda.name,
-        narrative,
-      });
-    }
-  }
+  const bonusNarrativeBlocks = collectSuperMdaBonusNarrativeBlocks(report.mdasByPerformanceTier);
 
   if (bonusNarrativeBlocks.length > 0) {
-    y = sectionHeading(doc, "NAICOM Super MDA — submission record", y);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...GRAY_MID);
-    y = drawWrappedText(
-      doc,
-      "Validated bonus-point submission on record for NAICOM (sole Super MDA on the programme roster).",
-      PDF_MARGIN_X,
-      y,
-      pw - PDF_MARGIN_X * 2,
-      { fontSize: 8, color: GRAY_MID, lineHeightMm: 4 }
-    ) + 4;
+    y = sectionHeading(doc, "Super MDA — regulatory simplification submissions", y);
+    y =
+      drawWrappedText(
+        doc,
+        "NPA and NCS validated bonus-point claims under the BEEPA Weighted Reform Framework (regulatory simplification cluster).",
+        PDF_MARGIN_X,
+        y,
+        pw - PDF_MARGIN_X * 2,
+        { fontSize: 8,
+          color: GRAY_MID,
+          lineHeightMm: 4 }
+      ) + 4;
 
     for (const block of bonusNarrativeBlocks) {
       doc.setFont("helvetica", "bold");
@@ -335,7 +315,8 @@ export function downloadGeneralReportPDF(report: {
           margin: { left: 14, right: 14 },
         });
         y = (doc as any).lastAutoTable.finalY + 6;
-      } else if (block.narrative.bullets && block.narrative.bullets.length > 0) {
+      }
+      if (block.narrative.bullets && block.narrative.bullets.length > 0) {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8);
         doc.setTextColor(...GRAY_DARK);

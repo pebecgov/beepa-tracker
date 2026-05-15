@@ -136,8 +136,8 @@ export const BEEPA_PROGRAMME_EXCEPTION_NOTES: readonly string[] = [
   "Nigeria Revenue Service (NRS) was granted an exception in light of the ongoing transition from FRS to NRS and the ongoing restructuring of the internal structure of NRS .",
 ];
 
-/** Super MDA bonus roster (empty = no Super MDA tier active). Re-add abbreviations here when re-enabled. */
-export const SUPER_MDA_BONUS_ABBREVIATIONS = [] as const;
+/** Super MDA bonus roster — validated regulatory-simplification submissions (bonus points). */
+export const SUPER_MDA_BONUS_ABBREVIATIONS = ["NPA", "NCS"] as const;
 
 export type ScorecardTier = {
   label: string;
@@ -209,18 +209,20 @@ export function getScorecardTierForMda(
   if (!mdaHasSuperMdaBonus(mda)) {
     return scoreTierBandOnly(score);
   }
-  if (score >= 0.995) {
-    return {
-      label: EXCEPTIONAL_SUPER_MDA_TIER_LABEL,
-      description:
-        "NAICOM at 100% applicable BEEPA score plus validated programme bonus points (submission on record).",
-      color: "green",
-    };
-  }
+  const abbrev = mda.abbreviation?.trim().toUpperCase() ?? "MDA";
+  const bonusNote =
+    abbrev === "NPA"
+      ? "Regulatory simplification for shipping company/agent licensing (certificate issuance); turnaround reduced from ~6 weeks to 10 working days, with March 2026 service-delivery evidence on record."
+      : abbrev === "NCS"
+        ? "Twelve qualifying regulatory simplification measures (digital trade, OSS, NII, STR, AfCFTA CoO, licensing) meeting BEEPA RS(A)–RS(C); ten live on public portals per Annex A submission."
+        : "Validated regulatory simplification bonus submission on record.";
+  const scoreNote =
+    score >= 0.995
+      ? " Applicable BEEPA reform score at full implementation."
+      : " Reform tracker score reflects ongoing BEEPA implementation alongside validated bonus claim.";
   return {
     label: EXCEPTIONAL_SUPER_MDA_TIER_LABEL,
-    description:
-      "NAICOM — bonus-eligible Super MDA; reform tracker score still building toward full completion.",
+    description: `${abbrev}: ${bonusNote}${scoreNote}`,
     color: "green",
   };
 }

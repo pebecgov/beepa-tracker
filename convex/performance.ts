@@ -420,29 +420,22 @@ export const getGeneralReport = query({
       }))
       .sort((a, b) => a.refNumber - b.refNumber);
 
-    /** Super MDA roster at ~100% score (row omitted when roster empty). */
-    const exceptionalSuperMdasFullScore = rankedMDAs.filter(
-      (p) =>
-        mdaHasSuperMdaBonus({ abbreviation: p.mda.abbreviation }) && p.score >= 0.995
+    /** Super MDA roster — validated bonus submissions (always listed in exceptional tier). */
+    const exceptionalSuperMdas = rankedMDAs.filter((p) =>
+      mdaHasSuperMdaBonus({ abbreviation: p.mda.abbreviation })
     );
 
     const scoreBandLabels = ["Excellent", "Very Good", "Good", "Fair", "Poor"] as const;
 
     const mdasByPerformanceTier = [
-      { label: EXCEPTIONAL_SUPER_MDA_TIER_LABEL, mdas: exceptionalSuperMdasFullScore },
+      { label: EXCEPTIONAL_SUPER_MDA_TIER_LABEL, mdas: exceptionalSuperMdas },
       ...scoreBandLabels.map((bandLabel) => ({
         label: bandLabel,
         mdas: rankedMDAs.filter((p) => {
-          if (
-            mdaHasSuperMdaBonus({ abbreviation: p.mda.abbreviation }) &&
-            p.score >= 0.995
-          ) {
+          if (mdaHasSuperMdaBonus({ abbreviation: p.mda.abbreviation })) {
             return false;
           }
-          if (mdaHasSuperMdaBonus({ abbreviation: p.mda.abbreviation })) {
-            return scoreTierBandOnly(p.score).label === bandLabel;
-          }
-          return p.tier.label === bandLabel;
+          return scoreTierBandOnly(p.score).label === bandLabel;
         }),
       })),
     ];
@@ -466,7 +459,7 @@ export const getGeneralReport = query({
         overallScore,
         overallStatus: getStatus(overallScore),
         highestScoreMda: rankedMDAs[0] ?? null,
-        exceptionalPerformanceCount: exceptionalSuperMdasFullScore.length,
+        exceptionalPerformanceCount: exceptionalSuperMdas.length,
         bonusEligibleOnTracker,
         fullImplementationCount: mdaPerformances.filter((performance) => performance.score >= 0.995)
           .length,
