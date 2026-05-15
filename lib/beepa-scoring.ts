@@ -10,7 +10,7 @@ export function mdaHasPartialReformScoring(mda: { abbreviation?: string | null }
     a === "SEC" || a === "NESREA" || a === "NITDA" || a === "REA" ||
     a === "NCAA" || a === "NUPRC" || a === "NMDPRA" || a === "NOTAP" ||
     a === "NDPC" || a === "NIPC" || a === "SCUML" || a === "ITF" || a === "NBS" ||
-    a === "NERC" || a === "NEPZA"
+    a === "NERC" || a === "NEPZA" || a === "NRS"
   );
 }
 
@@ -83,6 +83,9 @@ export function reformCountsTowardMdaScore(
   if (mda.abbreviation === "NEPZA") {
     return refNumber !== 6;
   }
+  if (mda.abbreviation === "NRS") {
+    return refNumber !== 3;
+  }
   return true;
 }
 
@@ -120,14 +123,37 @@ export function activityCountsTowardMdaScore(
   return true;
 }
 
-/** Super MDAs: abbreviations that earned bonus points via submitted qualifying information; extend when instructed. */
-export const SUPER_MDA_BONUS_ABBREVIATIONS = ["NAQS", "NCS", "NAICOM", "NUPRC"] as const;
+/** Abbreviation recorded as first MDA to complete the full BEEPA exercise (report column). */
+export const FIRST_BEEPA_COMPLETE_ABBREVIATION = "NAQS";
+
+/** Nigeria Revenue Service — Reform 3 excluded (tax reform statutory extension). Shown on reform summaries / PDF. */
+export const NRS_REFORM_THREE_EXEMPTION_NOTE =
+  "NRS exempt from Reform 3 scoring: statutory timeline extension under national tax reform implementation.";
+
+/** Programme exemption narratives — general report « Programme exemptions » panel / PDF. */
+export const BEEPA_PROGRAMME_EXEMPTION_NOTES: readonly string[] = [
+  "Patents & Designs Registry (PDR): exemption — issues with developers delaying compliant tracker delivery.",
+  "Trade Marks Registry: exemption — issues with developers delaying compliant tracker delivery.",
+  "Bank of Agriculture (BOA): exempt — not originally part of BEEPA; agency is being added now, so reforms treated as exempt pending onboarding.",
+  "NAIC: exemption — operational disruption following a fire outbreak affecting offices.",
+  "Nigeria Revenue Service (NRS): exemptions reflect ongoing national tax reform.",
+];
+
+export const SUPER_MDA_BONUS_ABBREVIATIONS = ["NAICOM"] as const;
 
 export type ScorecardTier = {
   label: string;
   description: string;
   color: string;
 };
+
+/** NAICOM at ~100% with bonus submission evidence (general report exceptional tier; excludes milestone-only row). */
+export const EXCEPTIONAL_SUPER_MDA_TIER_LABEL =
+  "Exceptional performance (NAICOM) — Submission of evidence for bonus point";
+
+/** Programme milestone row — first agency to complete BEEPA; not the NAICOM Super MDA designation. */
+export const FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL =
+  "First BEEPA completion (programme milestone)";
 
 export function mdaHasSuperMdaBonus(mda: { abbreviation?: string | null }): boolean {
   const a = mda.abbreviation?.trim();
@@ -136,38 +162,71 @@ export function mdaHasSuperMdaBonus(mda: { abbreviation?: string | null }): bool
   return (SUPER_MDA_BONUS_ABBREVIATIONS as readonly string[]).includes(upper);
 }
 
-/**
- * Admin scorecard tiers: Super MDA only for agencies whose submissions earned bonus points; all others use score bands only.
- */
-export function getScorecardTierForMda(
-  mda: { abbreviation?: string | null },
-  score: number
-): ScorecardTier {
-  if (mdaHasSuperMdaBonus(mda)) {
-    return {
-      label: "Super MDA",
-      description:
-        "Super MDA status from submitting qualifying information that earned programme bonus points. Other agencies are tiered only by BEEPA reform score.",
-      color: "green",
-    };
-  }
-  if (score >= 0.75) {
+export function scoreTierBandOnly(score: number): ScorecardTier {
+  if (score >= 0.995) {
     return {
       label: "Excellent",
-      description: "Strong implementation performance with limited outstanding gaps.",
+      description: "100% of applicable BEEPA reform weighted implementation.",
+      color: "blue",
+    };
+  }
+  if (score >= 0.8) {
+    return {
+      label: "Very Good",
+      description: "Strong reform implementation with residual gaps.",
+      color: "blue",
+    };
+  }
+  if (score >= 0.6) {
+    return {
+      label: "Good",
+      description: "Solid progress across reforms.",
       color: "blue",
     };
   }
   if (score >= 0.5) {
     return {
-      label: "Moderate",
-      description: "Meaningful progress recorded, but delivery gaps remain.",
+      label: "Fair",
+      description: "Meaningful but uneven implementation.",
       color: "yellow",
     };
   }
   return {
-    label: "Lower Tier",
-    description: "Requires focused follow-up and implementation support.",
+    label: "Poor",
+    description: "Requires focused implementation support.",
     color: "red",
   };
+}
+
+/**
+ * NAICOM Super MDA: exceptional tier when score ~100%; interim tier reflects tracker score until then.
+ * All other MDAs: score bands Excellent → Poor only.
+ */
+export function getScorecardTierForMda(
+  mda: { abbreviation?: string | null },
+  score: number
+): ScorecardTier {
+  if (!mdaHasSuperMdaBonus(mda)) {
+    return scoreTierBandOnly(score);
+  }
+  if (score >= 0.995) {
+    return {
+      label: EXCEPTIONAL_SUPER_MDA_TIER_LABEL,
+      description:
+        "NAICOM at 100% applicable BEEPA score plus validated programme bonus points (submission on record).",
+      color: "green",
+    };
+  }
+  return {
+    label: EXCEPTIONAL_SUPER_MDA_TIER_LABEL,
+    description:
+      "NAICOM — bonus-eligible Super MDA; reform tracker score still building toward full completion.",
+    color: "green",
+  };
+}
+
+/** General report tier tables: full name with abbreviation when present. */
+export function generalReportMdaNameWithAbbrev(mda: { name: string; abbreviation?: string | null }) {
+  const a = mda.abbreviation?.trim();
+  return a ? `${mda.name} (${a})` : mda.name;
 }

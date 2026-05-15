@@ -12,18 +12,31 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { useAppUser } from "@/components/UserProvider";
 import { Status } from "@/lib/types";
+import {
+  EXCEPTIONAL_SUPER_MDA_TIER_LABEL,
+  FIRST_BEEPA_COMPLETE_ABBREVIATION,
+  FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL,
+  generalReportMdaNameWithAbbrev,
+  mdaHasSuperMdaBonus,
+} from "@/lib/beepa-scoring";
+import type { SuperMdaBonusNarrative } from "@/lib/beepa-super-bonus-narratives";
+import { SUPER_MDA_BONUS_NARRATIVES } from "@/lib/beepa-super-bonus-narratives";
 import { formatDate, formatScore } from "@/lib/utils";
 import { downloadGeneralReportPDF } from "@/lib/pdf-export";
 
 function TierBadge({ label }: { label: string }) {
   const className =
-    label === "Super MDA"
+    label === EXCEPTIONAL_SUPER_MDA_TIER_LABEL
       ? "bg-green-100 text-green-800"
-      : label === "Excellent"
+      : label === FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL
         ? "bg-blue-100 text-blue-800"
-        : label === "Moderate"
+        : label === "Excellent" || label === "Very Good" || label === "Good"
+        ? "bg-blue-100 text-blue-800"
+        : label === "Fair"
           ? "bg-yellow-100 text-yellow-800"
-          : "bg-red-100 text-red-800";
+          : label === "Poor"
+            ? "bg-red-100 text-red-800"
+            : "bg-gray-100 text-gray-800";
 
   return (
     <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>
@@ -32,8 +45,53 @@ function TierBadge({ label }: { label: string }) {
   );
 }
 
-function EmptyState({ message }: { message: string }) {
-  return <p className="text-sm text-gray-500">{message}</p>;
+function BonusNarrativeCard({
+  abbrev,
+  name,
+  narrative,
+}: {
+  abbrev: string;
+  name: string;
+  narrative: SuperMdaBonusNarrative;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 bg-gray-50/80 p-4">
+      <p className="text-sm font-semibold text-gray-900">
+        {abbrev} — {name}
+      </p>
+      {narrative.title && (
+        <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-[#006B3F]">{narrative.title}</p>
+      )}
+      {narrative.submissionRows && narrative.submissionRows.length > 0 ? (
+        <div className="mt-3 overflow-x-auto rounded-md border border-gray-200 bg-white">
+          <table className="min-w-full divide-y divide-gray-200 text-xs">
+            <thead className="bg-[#006B3F]/10">
+              <tr>
+                <th className="px-3 py-2 text-left font-semibold text-gray-900">Activity / measure</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-900">Compliance level</th>
+                <th className="px-3 py-2 text-left font-semibold text-gray-900">Evidence</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {narrative.submissionRows.map((row, i) => (
+                <tr key={i}>
+                  <td className="px-3 py-2 text-gray-800">{row.activity}</td>
+                  <td className="px-3 py-2 text-gray-700">{row.complianceLevel}</td>
+                  <td className="px-3 py-2 text-gray-600">{row.evidenceAvailable}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : narrative.bullets && narrative.bullets.length > 0 ? (
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
+          {narrative.bullets.map((b, i) => (
+            <li key={i}>{b}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
 }
 
 export default function GeneralReportPage() {
@@ -84,15 +142,21 @@ export default function GeneralReportPage() {
     );
   }
 
-  const {
-    summary,
-    top10MDAs,
-    reformsDoneFirst,
-    leastCompletedReforms,
-    mdasByStatus,
-    mdasByTier,
-    clusterPerformance,
-  } = report;
+  const { summary, mdasByPerformanceTier, reformAreasCompletion, exemptionProgramNotes } = report;
+
+  const seenBonusMda = new Set<string>();
+  const bonusNarrativeBlocks: Array<{ abbrev: string; name: string; narrative: SuperMdaBonusNarrative }> = [];
+  for (const tierBlock of mdasByPerformanceTier) {
+    for (const item of tierBlock.mdas) {
+      if (!mdaHasSuperMdaBonus({ abbreviation: item.mda.abbreviation })) continue;
+      if (seenBonusMda.has(item.mda._id)) continue;
+      seenBonusMda.add(item.mda._id);
+      const abbrev = (item.mda.abbreviation || "").trim().toUpperCase();
+      const narrative = SUPER_MDA_BONUS_NARRATIVES[abbrev];
+      if (!narrative) continue;
+      bonusNarrativeBlocks.push({ abbrev: abbrev || item.mda.name, name: item.mda.name, narrative });
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -132,245 +196,189 @@ export default function GeneralReportPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <section className="rounded-xl border border-amber-100 bg-amber-50/70 px-5 py-4 text-sm text-amber-950">
+          <p className="font-semibold text-amber-900">How to read performance tiers</p>
+          <p className="mt-1 text-amber-950/90">
+            Only <span className="font-semibold">NAICOM</span> is designated a Super MDA. At ~100% applicable tracker score with bonus submission evidence it appears under «{" "}
+            {EXCEPTIONAL_SUPER_MDA_TIER_LABEL} » (excluding the milestone-only row).
+          </p>
+          <p className="mt-2 text-amber-950/90">
+            <span className="font-semibold">{FIRST_BEEPA_COMPLETE_ABBREVIATION}</span> is listed separately under «{" "}
+            {FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL} » as the first MDA to complete the full BEEPA exercise — not a Super MDA designation. NAICOM below ~100% follows Excellent /
+            Very Good / … by score; all other MDAs use score-only bands. Groupings are not a league table.
+          </p>
+        </section>
+
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-xs uppercase tracking-wider text-gray-500">Overall Score</p>
-            <p className="text-3xl font-bold text-[#006B3F] mt-2">
-              {formatScore(summary.overallScore)}
-            </p>
+            <p className="text-xs uppercase tracking-wider text-gray-500">Overall score</p>
+            <p className="text-3xl font-bold text-[#006B3F] mt-2">{formatScore(summary.overallScore)}</p>
             <p className="text-sm text-gray-600 mt-1">{summary.overallStatus.label}</p>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <p className="text-xs uppercase tracking-wider text-gray-500">Total MDAs</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">{summary.totalMDAs}</p>
-            <p className="text-sm text-gray-600 mt-1">Across BEEPA clusters</p>
+            <p className="text-sm text-gray-600 mt-1">On the BEEPA reform tracker</p>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-xs uppercase tracking-wider text-gray-500">Top MDA</p>
-            {summary.topMDA ? (
-              <>
-                <p className="text-xl font-bold text-gray-900 mt-2">
-                  {summary.topMDA.mda.abbreviation || summary.topMDA.mda.name}
-                </p>
-                <p className="text-sm text-gray-600 mt-1">{formatScore(summary.topMDA.score)}</p>
-              </>
-            ) : (
-              <EmptyState message="No MDA data yet" />
-            )}
+            <p className="text-xs uppercase tracking-wider text-gray-500">Exceptional MDAs</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">{summary.exceptionalPerformanceCount}</p>
+            <p className="text-sm text-gray-600 mt-1">NAICOM at ~100% with bonus submission</p>
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <p className="text-xs uppercase tracking-wider text-gray-500">Lowest Cluster</p>
-            {summary.lowestCluster ? (
-              <>
-                <p className="text-base font-bold text-gray-900 mt-2">
-                  {summary.lowestCluster.name}
-                </p>
-                <p className="text-sm text-gray-600 mt-1">
-                  {formatScore(summary.lowestCluster.score)}
-                </p>
-              </>
-            ) : (
-              <EmptyState message="No cluster data yet" />
-            )}
+            <p className="text-xs uppercase tracking-wider text-gray-500">Full implementation</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">{summary.fullImplementationCount}</p>
+            <p className="text-sm text-gray-600 mt-1">MDAs at ~100% applicable reform score</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <p className="text-xs uppercase tracking-wider text-gray-500">Super MDA on tracker</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">{summary.bonusEligibleOnTracker}</p>
+            <p className="text-sm text-gray-600 mt-1">NAICOM only (Super MDA)</p>
           </div>
         </section>
 
         <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-6 py-5 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Top 10 MDA Performance</h2>
+            <h2 className="text-lg font-semibold text-gray-900">MDAs by performance tier</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Applicable reforms and exemptions apply. Equal scores: earlier settlement of scoring activities ranks higher (same tie-break as the dashboard leaderboard).
+              <span className="font-semibold">{FIRST_BEEPA_COMPLETE_ABBREVIATION}</span> appears alone under the milestone tier row below.
             </p>
           </div>
           <div className="divide-y divide-gray-100">
-            {top10MDAs.map((item) => (
-              <div key={item.mda._id} className="px-6 py-4 grid grid-cols-12 gap-4 items-center">
-                <div className="col-span-1 text-lg font-bold text-[#006B3F]">#{item.rank}</div>
-                <div className="col-span-4">
-                  <p className="text-sm font-semibold text-gray-900">{item.mda.name}</p>
-                  {item.mda.abbreviation && (
-                    <p className="text-xs text-gray-500">{item.mda.abbreviation}</p>
-                  )}
+            {mdasByPerformanceTier.map((tierBlock) =>
+              tierBlock.mdas.length === 0 ? null : (
+                <div key={tierBlock.label} className="px-6 py-6">
+                  <div className="flex flex-wrap items-center gap-3 mb-4">
+                    <TierBadge label={tierBlock.label} />
+                    <span className="text-sm text-gray-500">
+                      {tierBlock.mdas.length} {tierBlock.mdas.length === 1 ? "MDA" : "MDAs"}
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto rounded-lg border border-gray-100">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-900">MDA</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-900">Score</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-900">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white">
+                        {tierBlock.mdas.map((item) => (
+                          <tr key={item.mda._id}>
+                            <td className="px-4 py-3 font-medium text-gray-900 max-w-md">
+                              {generalReportMdaNameWithAbbrev(item.mda)}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex flex-col gap-1 max-w-[200px]">
+                                <ProgressBar
+                                  score={item.score}
+                                  color={(item.status as Status).color}
+                                  showLabel={false}
+                                  size="sm"
+                                />
+                                <span className="text-xs font-semibold text-gray-900">
+                                  {formatScore(item.score)}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-700">{item.status.label}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-                <div className="col-span-4">
-                  <ProgressBar score={item.score} color={(item.status as Status).color} showLabel={false} size="sm" />
-                </div>
-                <div className="col-span-1 text-sm font-bold text-gray-900">{formatScore(item.score)}</div>
-                <div className="col-span-2 flex justify-end">
-                  <TierBadge label={item.tier.label} />
-                </div>
-              </div>
-            ))}
+              )
+            )}
           </div>
         </section>
 
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900">Quick-Win Reform Areas</h2>
-            <p className="text-sm text-gray-500 mt-1 mb-5">
-              Reforms with the highest completion rates across applicable MDAs.
-            </p>
-            <div className="space-y-4">
-              {reformsDoneFirst.map((reform) => (
-                <div key={reform.refNumber}>
-                  <div className="flex items-start justify-between gap-4 mb-1">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        Reform {reform.refNumber}: {reform.name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {reform.completedMdaCount}/{reform.applicableMdaCount} MDAs complete
-                      </p>
-                    </div>
-                    <span className="text-sm font-bold text-gray-900">
-                      {formatScore(reform.completionRate)}
-                    </span>
-                  </div>
-                  <ProgressBar score={reform.completionRate} color="green" showLabel={false} size="sm" />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900">Implementation Gaps</h2>
-            <p className="text-sm text-gray-500 mt-1 mb-5">
-              Reforms most MDAs have not fully completed.
-            </p>
-            <div className="space-y-5">
-              {leastCompletedReforms.map((reform) => (
-                <div key={reform.refNumber}>
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        Reform {reform.refNumber}: {reform.name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {reform.mdasNotDone.length} MDAs not fully complete
-                      </p>
-                    </div>
-                    <span className="text-sm font-bold text-gray-900">
-                      {formatScore(reform.completionRate)}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {reform.mdasNotDone.slice(0, 10).map((mda) => (
-                      <span
-                        key={`${reform.refNumber}-${mda.name}`}
-                        className="rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-800"
-                      >
-                        {mda.abbreviation || mda.name} · {formatScore(mda.score)}
-                      </span>
-                    ))}
-                    {reform.mdasNotDone.length > 10 && (
-                      <span className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
-                        +{reform.mdasNotDone.length - 10} more
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900">MDA Status Distribution</h2>
-            <div className="mt-5 space-y-4">
-              {mdasByStatus.map((group) => (
-                <div key={group.label} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-semibold text-gray-900">{group.label}</p>
-                    <span className="text-sm font-bold text-gray-700">{group.mdas.length}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {group.mdas.length === 0 ? (
-                      <EmptyState message="No MDAs in this status" />
-                    ) : (
-                      group.mdas.map((item) => (
-                        <span key={item.mda._id} className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
-                          {item.mda.abbreviation || item.mda.name} · {formatScore(item.score)}
-                        </span>
-                      ))
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900">General Scoring Tiers</h2>
+        {bonusNarrativeBlocks.length > 0 && (
+          <section className="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900">NAICOM Super MDA — submission record</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Admin view: Super MDAs earned bonus points through qualifying submissions; other tiers follow BEEPA score only.
+              Structured summary where NAICOM&apos;s validated bonus submission is on record.
             </p>
-            <div className="mt-5 space-y-4">
-              {mdasByTier.map((group) => (
-                <div key={group.label} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                  <div className="flex items-center justify-between mb-2">
-                    <TierBadge label={group.label} />
-                    <span className="text-sm font-bold text-gray-700">{group.mdas.length}</span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {group.mdas.length === 0 ? (
-                      <EmptyState message="No MDAs in this tier" />
-                    ) : (
-                      group.mdas.map((item) => (
-                        <span key={item.mda._id} className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700">
-                          {item.mda.abbreviation || item.mda.name} · {formatScore(item.score)}
-                        </span>
-                      ))
-                    )}
-                  </div>
-                </div>
+            <div className="mt-6 space-y-4">
+              {bonusNarrativeBlocks.map((block) => (
+                <BonusNarrativeCard
+                  key={`${block.abbrev}-${block.name}`}
+                  abbrev={block.abbrev}
+                  name={block.name}
+                  narrative={block.narrative}
+                />
               ))}
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-6 py-5 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Cluster Performance</h2>
+            <h2 className="text-lg font-semibold text-gray-900">Reform areas and completion rate</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Cluster average is based on matched MDAs in each committee.
+              Completion counts applicable MDAs only. Columns{" "}
+              <span className="rounded bg-amber-100 px-1 font-medium text-amber-900">Ongoing</span> and{" "}
+              <span className="rounded bg-violet-100 px-1 font-medium text-violet-900">Exempt</span> use distinct
+              styling (matches PDF).
             </p>
           </div>
-          <div className="divide-y divide-gray-100">
-            {clusterPerformance.map((cluster, index) => (
-              <div key={cluster.id} className="p-6">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:items-center">
-                  <div className="lg:col-span-1 text-lg font-bold text-[#006B3F]">#{index + 1}</div>
-                  <div className="lg:col-span-5">
-                    <h3 className="text-sm font-semibold text-gray-900">{cluster.name}</h3>
-                    <p className="text-xs text-gray-500">Cluster Lead: {cluster.lead}</p>
-                    <p className="text-xs text-gray-500">
-                      {cluster.matchedMdaCount}/{cluster.mdaCount} MDAs matched
-                    </p>
-                  </div>
-                  <div className="lg:col-span-4">
-                    <ProgressBar score={cluster.score} color={(cluster.status as Status).color} showLabel={false} size="sm" />
-                  </div>
-                  <div className="lg:col-span-2 lg:text-right">
-                    <p className="text-sm font-bold text-gray-900">{formatScore(cluster.score)}</p>
-                    <p className="text-xs text-gray-500">{cluster.status.label}</p>
-                  </div>
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {cluster.members.map((member) => (
-                    <span
-                      key={member.name}
-                      className="rounded-full bg-gray-100 px-2 py-1 text-xs font-medium text-gray-700"
-                    >
-                      {member.performance?.mda.abbreviation || member.name}
-                      {member.performance ? ` · ${formatScore(member.performance.score)}` : " · No data"}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900">Ref</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900">Reform</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900">Completion</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-900">Complete</th>
+                  <th className="px-4 py-3 text-left font-semibold text-amber-950 bg-amber-50">Ongoing</th>
+                  <th className="px-4 py-3 text-left font-semibold text-violet-950 bg-violet-50">Exempt</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 bg-white">
+                {reformAreasCompletion.map((row) => (
+                  <tr key={row.refNumber}>
+                    <td className="px-4 py-3 font-medium text-gray-900">R{row.refNumber}</td>
+                    <td className="px-4 py-3 text-gray-800">{row.name}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-1 max-w-[180px]">
+                        <ProgressBar score={row.completionRate} color="green" showLabel={false} size="sm" />
+                        <span className="text-xs font-semibold">{formatScore(row.completionRate)}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-700">
+                      {row.completedMdaCount}/{row.applicableMdaCount}
+                    </td>
+                    <td className="px-4 py-3 bg-amber-50/90 font-medium text-amber-950">{row.ongoingMdaCount}</td>
+                    <td className="px-4 py-3 bg-violet-50/90 font-medium text-violet-950">{row.exemptMdaCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
+
+        {exemptionProgramNotes.length > 0 && (
+          <section className="rounded-xl overflow-hidden border-2 border-fuchsia-700 shadow-lg shadow-fuchsia-950/15 ring-1 ring-fuchsia-400/30">
+            <div className="bg-linear-to-r from-fuchsia-800 via-fuchsia-700 to-pink-700 px-6 py-4">
+              <h2 className="text-lg font-bold tracking-wide text-white">Programme exemptions</h2>
+              <p className="mt-1.5 text-sm leading-snug text-fuchsia-100/95">
+                Formal exemptions affecting tracker scoring and reform applicability — distinct from standard tier grouping.
+              </p>
+            </div>
+            <div className="space-y-3 bg-linear-to-b from-fuchsia-50 to-pink-50 px-5 py-5 border-t border-fuchsia-300/60">
+              {exemptionProgramNotes.map((note, i) => (
+                <div
+                  key={i}
+                  className="flex gap-0 overflow-hidden rounded-lg border border-fuchsia-200 bg-white shadow-sm"
+                >
+                  <div className="w-1.5 shrink-0 bg-linear-to-b from-fuchsia-600 to-pink-600" aria-hidden />
+                  <p className="flex-1 py-3.5 pr-4 pl-4 text-sm leading-relaxed text-gray-800">{note}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
       </main>
     </div>
   );

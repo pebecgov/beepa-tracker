@@ -4,8 +4,13 @@ import {
   reformCountsTowardMdaScore,
   activityCountsTowardMdaScore,
   getScorecardTierForMda,
+  mdaHasSuperMdaBonus,
+  EXCEPTIONAL_SUPER_MDA_TIER_LABEL,
+  FIRST_BEEPA_COMPLETE_ABBREVIATION,
+  scoreTierBandOnly,
+  FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL,
+  BEEPA_PROGRAMME_EXEMPTION_NOTES,
 } from "../lib/beepa-scoring";
-import { CLUSTERS } from "../lib/cluster-data";
 
 // Status thresholds and labels (based on PEBEC standards)
 // Requires Intervention: 0-30%, Progressing With Difficulty: 31-49%, Progressing: 50-70%, Progressing Well: 71-89%, Successful: 90-100%
@@ -358,154 +363,108 @@ export const getGeneralReport = query({
       return a.mda.name.localeCompare(b.mda.name);
     });
 
-    const reformMap = new Map<
+    const reformUnified = new Map<
       number,
       {
         refNumber: number;
         name: string;
         applicableMdaCount: number;
         completedMdaCount: number;
-        startedMdaCount: number;
-        totalScore: number;
-        mdasNotDone: Array<{
-          name: string;
-          abbreviation: string | null;
-          score: number;
-          status: string;
-        }>;
+        ongoingMdaCount: number;
+        exemptMdaCount: number;
+        applicableScoreSum: number;
       }
     >();
 
     for (const performance of mdaPerformances) {
       for (const reform of performance.reformRows) {
-        if (!reform.countsTowardOverall) continue;
-
-        const existing =
-          reformMap.get(reform.refNumber) ||
+        const entry =
+          reformUnified.get(reform.refNumber) ||
           {
             refNumber: reform.refNumber,
             name: reform.name,
             applicableMdaCount: 0,
             completedMdaCount: 0,
-            startedMdaCount: 0,
-            totalScore: 0,
-            mdasNotDone: [],
+            ongoingMdaCount: 0,
+            exemptMdaCount: 0,
+            applicableScoreSum: 0,
           };
 
-        existing.applicableMdaCount++;
-        existing.totalScore += reform.score;
-        if (reform.score >= 0.999) existing.completedMdaCount++;
-        if (reform.score > 0) existing.startedMdaCount++;
-        if (reform.score < 0.999) {
-          existing.mdasNotDone.push({
-            name: performance.mda.name,
-            abbreviation: performance.mda.abbreviation,
-            score: reform.score,
-            status: reform.score === 0 ? "Not Started" : "In Progress",
-          });
+        if (!reform.countsTowardOverall) {
+          entry.exemptMdaCount++;
+        } else {
+          entry.applicableMdaCount++;
+          entry.applicableScoreSum += reform.score;
+          if (reform.score >= 0.999) entry.completedMdaCount++;
+          else if (reform.score > 0) entry.ongoingMdaCount++;
         }
 
-        reformMap.set(reform.refNumber, existing);
+        reformUnified.set(reform.refNumber, entry);
       }
     }
 
-    const reformAnalysis = [...reformMap.values()]
-      .map((reform) => ({
-        ...reform,
+    const reformAreasCompletion = [...reformUnified.values()]
+      .map((row) => ({
+        refNumber: row.refNumber,
+        name: row.name,
+        applicableMdaCount: row.applicableMdaCount,
+        completedMdaCount: row.completedMdaCount,
+        ongoingMdaCount: row.ongoingMdaCount,
+        exemptMdaCount: row.exemptMdaCount,
         completionRate:
-          reform.applicableMdaCount === 0
+          row.applicableMdaCount === 0
             ? 0
-            : reform.completedMdaCount / reform.applicableMdaCount,
-        startedRate:
-          reform.applicableMdaCount === 0
+            : row.completedMdaCount / row.applicableMdaCount,
+        averageApplicableScore:
+          row.applicableMdaCount === 0
             ? 0
-            : reform.startedMdaCount / reform.applicableMdaCount,
-        averageScore:
-          reform.applicableMdaCount === 0
-            ? 0
-            : reform.totalScore / reform.applicableMdaCount,
-        mdasNotDone: reform.mdasNotDone.sort((a, b) => a.score - b.score),
+            : row.applicableScoreSum / row.applicableMdaCount,
       }))
       .sort((a, b) => a.refNumber - b.refNumber);
 
-    const reformsDoneFirst = [...reformAnalysis]
-      .sort((a, b) => {
-        if (b.completionRate !== a.completionRate) return b.completionRate - a.completionRate;
-        return b.averageScore - a.averageScore;
-      })
-      .slice(0, 5);
+    const firstCompleterUpper = FIRST_BEEPA_COMPLETE_ABBREVIATION.toUpperCase();
+    const isFirstBeepaCompleterAbbrev = (abbrev?: string | null) =>
+      (abbrev || "").trim().toUpperCase() === firstCompleterUpper;
 
-    const leastCompletedReforms = [...reformAnalysis]
-      .sort((a, b) => {
-        if (a.completionRate !== b.completionRate) return a.completionRate - b.completionRate;
-        return a.averageScore - b.averageScore;
-      })
-      .slice(0, 5);
+    /** NAICOM (Super MDA) + ~100% score + not the first-completion milestone MDA (shown separately below). */
+    const exceptionalSuperMdasFullScore = rankedMDAs.filter(
+      (p) =>
+        mdaHasSuperMdaBonus({ abbreviation: p.mda.abbreviation }) &&
+        !isFirstBeepaCompleterAbbrev(p.mda.abbreviation) &&
+        p.score >= 0.995
+    );
 
-    const statusOrder = [
-      "Successful",
-      "Progressing Well",
-      "In Progress",
-      "Progressing With Difficulty",
-      "Requires Intervention",
+    const superMdaFirstCompletionRow = rankedMDAs.filter((p) =>
+      isFirstBeepaCompleterAbbrev(p.mda.abbreviation)
+    );
+
+    const scoreBandLabels = ["Excellent", "Very Good", "Good", "Fair", "Poor"] as const;
+
+    const mdasByPerformanceTier = [
+      { label: EXCEPTIONAL_SUPER_MDA_TIER_LABEL, mdas: exceptionalSuperMdasFullScore },
+      { label: FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL, mdas: superMdaFirstCompletionRow },
+      ...scoreBandLabels.map((bandLabel) => ({
+        label: bandLabel,
+        mdas: rankedMDAs.filter((p) => {
+          if (isFirstBeepaCompleterAbbrev(p.mda.abbreviation)) return false;
+          if (
+            mdaHasSuperMdaBonus({ abbreviation: p.mda.abbreviation }) &&
+            !isFirstBeepaCompleterAbbrev(p.mda.abbreviation) &&
+            p.score >= 0.995
+          ) {
+            return false;
+          }
+          if (mdaHasSuperMdaBonus({ abbreviation: p.mda.abbreviation })) {
+            return scoreTierBandOnly(p.score).label === bandLabel;
+          }
+          return p.tier.label === bandLabel;
+        }),
+      })),
     ];
-    const mdasByStatus = statusOrder.map((label) => ({
-      label,
-      mdas: rankedMDAs.filter((performance) => performance.status.label === label),
-    }));
 
-    const tierOrder = ["Super MDA", "Excellent", "Moderate", "Lower Tier"];
-    const mdasByTier = tierOrder.map((label) => ({
-      label,
-      mdas: rankedMDAs.filter((performance) => performance.tier.label === label),
-    }));
-
-    const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
-    const getClusterMemberPerformance = (clusterMdaName: string) => {
-      const bracketMatch = clusterMdaName.match(/\(([^)]+)\)\s*$/);
-      const clusterAbbreviation = bracketMatch ? normalize(bracketMatch[1]) : null;
-      const clusterBaseName = normalize(clusterMdaName.replace(/\s*\([^)]+\)\s*$/, ""));
-
-      return mdaPerformances.find((performance) => {
-        const mdaName = normalize(performance.mda.name);
-        const mdaAbbreviation = performance.mda.abbreviation
-          ? normalize(performance.mda.abbreviation)
-          : null;
-
-        return (
-          mdaName === clusterBaseName ||
-          (clusterAbbreviation !== null && clusterAbbreviation === mdaAbbreviation) ||
-          mdaName === normalize(clusterMdaName)
-        );
-      });
-    };
-
-    const clusterPerformance = CLUSTERS.map((cluster) => {
-      const members = cluster.members.map((member) => ({
-        name: member.name,
-        performance: getClusterMemberPerformance(member.name) || null,
-      }));
-      const membersWithData = members.filter((member) => member.performance !== null);
-      const score =
-        membersWithData.length === 0
-          ? 0
-          : membersWithData.reduce((sum, member) => sum + member.performance!.score, 0) /
-            membersWithData.length;
-
-      return {
-        id: cluster.id,
-        name: cluster.name,
-        lead: cluster.lead,
-        score,
-        status: getStatus(score),
-        mdaCount: cluster.members.length,
-        matchedMdaCount: membersWithData.length,
-        members,
-      };
-    }).sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return a.name.localeCompare(b.name);
-    });
+    const bonusEligibleOnTracker = mdaPerformances.filter((performance) =>
+      mdaHasSuperMdaBonus({ abbreviation: performance.mda.abbreviation })
+    ).length;
 
     const overallScore =
       mdaPerformances.length === 0
@@ -521,18 +480,15 @@ export const getGeneralReport = query({
         totalActivities: activities.length,
         overallScore,
         overallStatus: getStatus(overallScore),
-        topMDA: rankedMDAs[0] ?? null,
-        lowestCluster: clusterPerformance[clusterPerformance.length - 1] ?? null,
+        highestScoreMda: rankedMDAs[0] ?? null,
+        exceptionalPerformanceCount: exceptionalSuperMdasFullScore.length,
+        bonusEligibleOnTracker,
+        fullImplementationCount: mdaPerformances.filter((performance) => performance.score >= 0.995)
+          .length,
       },
-      top10MDAs: rankedMDAs.slice(0, 10).map((performance, index) => ({
-        ...performance,
-        rank: index + 1,
-      })),
-      reformsDoneFirst,
-      leastCompletedReforms,
-      mdasByStatus,
-      mdasByTier,
-      clusterPerformance,
+      mdasByPerformanceTier,
+      reformAreasCompletion,
+      exemptionProgramNotes: [...BEEPA_PROGRAMME_EXEMPTION_NOTES],
     };
   },
 });

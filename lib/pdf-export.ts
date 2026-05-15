@@ -4,6 +4,15 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+import {
+  EXCEPTIONAL_SUPER_MDA_TIER_LABEL,
+  FIRST_BEEPA_COMPLETE_ABBREVIATION,
+  FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL,
+  generalReportMdaNameWithAbbrev,
+  mdaHasSuperMdaBonus,
+} from "./beepa-scoring";
+import { SUPER_MDA_BONUS_NARRATIVES, type SuperMdaBonusNarrative } from "./beepa-super-bonus-narratives";
+
 // ─── colours ────────────────────────────────────────────────────────────────
 const PEBEC_GREEN: [number, number, number] = [0, 107, 63];
 const PEBEC_GREEN_LIGHT: [number, number, number] = [230, 245, 238];
@@ -11,6 +20,14 @@ const GRAY_DARK: [number, number, number] = [31, 41, 55];
 const GRAY_MID: [number, number, number] = [107, 114, 128];
 const GRAY_LIGHT: [number, number, number] = [243, 244, 246];
 const WHITE: [number, number, number] = [255, 255, 255];
+/** Reform table: MDAs with reform in progress */
+const ONGOING_CELL_BG: [number, number, number] = [254, 243, 199];
+/** Reform table: MDAs exempt from reform scoring */
+const EXEMPT_CELL_BG: [number, number, number] = [237, 233, 254];
+/** Programme exemptions section (distinct from score/report sections). */
+const EXEMPT_MAGENTA: [number, number, number] = [157, 23, 77];
+const EXEMPT_MAGENTA_PANEL: [number, number, number] = [253, 242, 248];
+const EXEMPT_MAGENTA_ACCENT: [number, number, number] = [219, 39, 119];
 
 function pct(v: number) {
   return `${Math.round(v * 100)}%`;
@@ -62,56 +79,48 @@ function sectionHeading(doc: jsPDF, text: string, y: number) {
   return y + 11;
 }
 
+function exemptionSectionHeading(doc: jsPDF, text: string, y: number) {
+  const pw = doc.internal.pageSize.getWidth();
+  doc.setFillColor(...EXEMPT_MAGENTA);
+  doc.rect(14, y, pw - 28, 7, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  doc.setTextColor(...WHITE);
+  doc.text(text.toUpperCase(), 17, y + 5);
+  return y + 11;
+}
+
 // ─── General Report PDF ───────────────────────────────────────────────────────
+
 export function downloadGeneralReportPDF(report: {
   generatedAt: number;
   summary: {
     totalMDAs: number;
     overallScore: number;
     overallStatus: { label: string };
-    topMDA: { mda: { name: string; abbreviation?: string | null }; score: number } | null;
-    lowestCluster: { name: string; score: number } | null;
+    exceptionalPerformanceCount: number;
+    bonusEligibleOnTracker: number;
+    fullImplementationCount: number;
   };
-  top10MDAs: Array<{
-    rank: number;
-    mda: { name: string; abbreviation?: string | null };
-    score: number;
-    status: { label: string };
-    tier: { label: string };
-  }>;
-  reformsDoneFirst: Array<{
-    refNumber: number;
-    name: string;
-    completedMdaCount: number;
-    applicableMdaCount: number;
-    completionRate: number;
-  }>;
-  leastCompletedReforms: Array<{
-    refNumber: number;
-    name: string;
-    completionRate: number;
-    mdasNotDone: Array<{ name: string; abbreviation: string | null; score: number }>;
-  }>;
-  mdasByStatus: Array<{
+  mdasByPerformanceTier: Array<{
     label: string;
-    mdas: Array<{ mda: { name: string; abbreviation?: string | null }; score: number }>;
-  }>;
-  mdasByTier: Array<{
-    label: string;
-    mdas: Array<{ mda: { name: string; abbreviation?: string | null }; score: number }>;
-  }>;
-  clusterPerformance: Array<{
-    name: string;
-    lead: string;
-    score: number;
-    status: { label: string };
-    mdaCount: number;
-    matchedMdaCount: number;
-    members: Array<{
-      name: string;
-      performance: { mda: { abbreviation?: string | null }; score: number } | null;
+    mdas: Array<{
+      mda: { _id: string; name: string; abbreviation?: string | null };
+      score: number;
+      status: { label: string };
+      tier: { label: string };
     }>;
   }>;
+  reformAreasCompletion: Array<{
+    refNumber: number;
+    name: string;
+    applicableMdaCount: number;
+    completedMdaCount: number;
+    ongoingMdaCount: number;
+    exemptMdaCount: number;
+    completionRate: number;
+  }>;
+  exemptionProgramNotes: string[];
 }) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
@@ -130,159 +139,241 @@ export function downloadGeneralReportPDF(report: {
 
   let y = 44;
 
-  // ── Summary stat boxes ────────────────────────────────────────────────────
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...GRAY_DARK);
+  const legendLines = doc.splitTextToSize(
+    `Only NAICOM carries the Super MDA designation. « ${EXCEPTIONAL_SUPER_MDA_TIER_LABEL} » applies when NAICOM is at ~100% applicable tracker score with bonus submission evidence (excluding the milestone-only row). ` +
+      `« ${FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL} » recognises ${FIRST_BEEPA_COMPLETE_ABBREVIATION} as the first MDA to complete the full BEEPA exercise — not a Super MDA designation. ` +
+      "NAICOM below ~100% is grouped under Excellent / Very Good / … by score. All other MDAs use score-only bands: Excellent 100% · Very Good 80–99% · Good 60–79% · Fair 50–59% · Poor 0–49%. " +
+      "Not ranked as a league table. " +
+      `Super MDA on tracker (NAICOM): ${report.summary.bonusEligibleOnTracker}.`,
+    pw - 28
+  );
+  doc.text(legendLines, 14, y);
+  y += legendLines.length * 4 + 8;
+
   const stats = [
-    { label: "Overall Score", value: pct(report.summary.overallScore) },
+    { label: "Overall score", value: pct(report.summary.overallScore) },
     { label: "Status", value: report.summary.overallStatus.label },
     { label: "Total MDAs", value: String(report.summary.totalMDAs) },
     {
-      label: "Top MDA",
-      value: report.summary.topMDA
-        ? `${report.summary.topMDA.mda.abbreviation || report.summary.topMDA.mda.name} (${pct(report.summary.topMDA.score)})`
-        : "—",
+      label: "Exceptional MDAs",
+      value: String(report.summary.exceptionalPerformanceCount),
+    },
+    {
+      label: "Full implementation",
+      value: String(report.summary.fullImplementationCount),
+    },
+    {
+      label: "Super MDA on tracker",
+      value: String(report.summary.bonusEligibleOnTracker),
     },
   ];
-  const boxW = (pw - 28) / 4;
+  const boxW = (pw - 28) / 3;
   stats.forEach((stat, i) => {
-    const bx = 14 + i * boxW;
+    const row = Math.floor(i / 3);
+    const col = i % 3;
+    const bx = 14 + col * boxW;
+    const by = y + row * 20;
     doc.setFillColor(...GRAY_LIGHT);
-    doc.roundedRect(bx, y, boxW - 2, 16, 2, 2, "F");
+    doc.roundedRect(bx, by, boxW - 2, 16, 2, 2, "F");
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
     doc.setTextColor(...GRAY_MID);
-    doc.text(stat.label.toUpperCase(), bx + 3, y + 5);
+    doc.text(stat.label.toUpperCase(), bx + 3, by + 5);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setTextColor(...GRAY_DARK);
-    doc.text(stat.value, bx + 3, y + 12);
+    doc.text(stat.value, bx + 3, by + 12);
   });
-  y += 22;
+  y += Math.ceil(stats.length / 3) * 20 + 8;
 
-  // ── Top 10 ────────────────────────────────────────────────────────────────
-  y = sectionHeading(doc, "Top 10 MDA Performance", y);
+  y = sectionHeading(doc, "MDAs by performance tier", y);
   doc.setFont("helvetica", "italic");
   doc.setFontSize(7);
   doc.setTextColor(...GRAY_MID);
-  y += 5;
-  autoTable(doc, {
-    startY: y,
-    head: [["Rank", "MDA", "Abbreviation", "Score", "Status", "Tier"]],
-    body: report.top10MDAs.map((item) => [
-      `#${item.rank}`,
-      item.mda.name,
-      item.mda.abbreviation || "—",
-      pct(item.score),
-      item.status.label,
-      item.tier.label,
-    ]),
-    styles: { fontSize: 8, cellPadding: 3 },
-    headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
-    columnStyles: { 0: { cellWidth: 12 }, 2: { cellWidth: 22 }, 3: { cellWidth: 16 }, 5: { cellWidth: 22 } },
-    margin: { left: 14, right: 14 },
-  });
-  y = (doc as any).lastAutoTable.finalY + 8;
+  const tierIntro = doc.splitTextToSize(
+    `${FIRST_BEEPA_COMPLETE_ABBREVIATION} appears alone under its dedicated milestone tier (below); not a Super MDA designation.`,
+    pw - 28
+  );
+  doc.text(tierIntro, 14, y);
+  y += tierIntro.length * 4 + 4;
 
-  // ── Quick-Win Reforms ─────────────────────────────────────────────────────
-  y = sectionHeading(doc, "Quick-Win Reform Areas", y);
+  for (const tierBlock of report.mdasByPerformanceTier) {
+    if (tierBlock.mdas.length === 0) continue;
+    y = sectionHeading(doc, tierBlock.label, y + 2);
+    autoTable(doc, {
+      startY: y,
+      head: [["MDA", "Score", "Status"]],
+      body: tierBlock.mdas.map((item) => [
+        generalReportMdaNameWithAbbrev(item.mda),
+        pct(item.score),
+        item.status.label,
+      ]),
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: {
+        0: { cellWidth: 88 },
+        1: { cellWidth: 22 },
+        2: { cellWidth: 56 },
+      },
+      margin: { left: 14, right: 14 },
+    });
+    y = (doc as any).lastAutoTable.finalY + 8;
+  }
+
+  const seenBonusMda = new Set<string>();
+  const bonusNarrativeBlocks: Array<{ name: string; abbrev: string; narrative: SuperMdaBonusNarrative }> = [];
+  for (const tierBlock of report.mdasByPerformanceTier) {
+    for (const item of tierBlock.mdas) {
+      if (!mdaHasSuperMdaBonus({ abbreviation: item.mda.abbreviation })) continue;
+      if (seenBonusMda.has(item.mda._id)) continue;
+      seenBonusMda.add(item.mda._id);
+      const abbrev = (item.mda.abbreviation || "").trim().toUpperCase();
+      const narrative = SUPER_MDA_BONUS_NARRATIVES[abbrev];
+      if (!narrative) continue;
+      bonusNarrativeBlocks.push({
+        name: item.mda.name,
+        abbrev: abbrev || item.mda.name,
+        narrative,
+      });
+    }
+  }
+
+  if (bonusNarrativeBlocks.length > 0) {
+    y = sectionHeading(doc, "NAICOM Super MDA — submission record", y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...GRAY_MID);
+    const intro = doc.splitTextToSize(
+      "Validated bonus-point submission on record for NAICOM (sole Super MDA on the programme roster).",
+      pw - 28
+    );
+    doc.text(intro, 14, y);
+    y += intro.length * 4 + 4;
+
+    for (const block of bonusNarrativeBlocks) {
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setTextColor(...GRAY_DARK);
+      doc.text(`${block.abbrev} — ${block.name}`, 14, y);
+      y += 5;
+      if (block.narrative.title) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.setTextColor(...PEBEC_GREEN);
+        const titleLines = doc.splitTextToSize(block.narrative.title, pw - 28);
+        doc.text(titleLines, 14, y);
+        y += titleLines.length * 4 + 2;
+      }
+      if (block.narrative.submissionRows && block.narrative.submissionRows.length > 0) {
+        autoTable(doc, {
+          startY: y,
+          head: [["Activity / measure", "Compliance level", "Evidence / reference"]],
+          body: block.narrative.submissionRows.map((row) => [
+            row.activity,
+            row.complianceLevel,
+            row.evidenceAvailable,
+          ]),
+          styles: { fontSize: 7, cellPadding: 2 },
+          headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 7 },
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+          columnStyles: { 0: { cellWidth: 58 }, 1: { cellWidth: 58 } },
+          margin: { left: 14, right: 14 },
+        });
+        y = (doc as any).lastAutoTable.finalY + 6;
+      } else if (block.narrative.bullets && block.narrative.bullets.length > 0) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(...GRAY_DARK);
+        const bulletText = block.narrative.bullets.map((b) => `• ${b}`).join("\n");
+        const blines = doc.splitTextToSize(bulletText, pw - 28);
+        doc.text(blines, 14, y);
+        y += blines.length * 4 + 6;
+      }
+    }
+  }
+
+  y = sectionHeading(doc, "Reform areas and completion rate", y);
   autoTable(doc, {
     startY: y,
-    head: [["Reform", "Name", "MDAs Complete", "Completion Rate"]],
-    body: report.reformsDoneFirst.map((r) => [
-      `Reform ${r.refNumber}`,
+    head: [["Ref", "Reform", "Completion", "Complete", "Ongoing", "Exempt"]],
+    body: report.reformAreasCompletion.map((r) => [
+      `R${r.refNumber}`,
       r.name,
-      `${r.completedMdaCount} / ${r.applicableMdaCount}`,
       pct(r.completionRate),
+      `${r.completedMdaCount}/${r.applicableMdaCount}`,
+      String(r.ongoingMdaCount),
+      String(r.exemptMdaCount),
     ]),
     styles: { fontSize: 8, cellPadding: 3 },
-    headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
+    headStyles: {
+      fillColor: PEBEC_GREEN,
+      textColor: WHITE,
+      fontStyle: "bold",
+      fontSize: 8,
+    },
     alternateRowStyles: { fillColor: [248, 250, 252] },
-    columnStyles: { 0: { cellWidth: 22 }, 3: { cellWidth: 28 } },
+    columnStyles: {
+      0: { cellWidth: 14 },
+      2: { cellWidth: 22 },
+      3: { cellWidth: 22 },
+      4: { cellWidth: 18 },
+      5: { cellWidth: 18 },
+    },
     margin: { left: 14, right: 14 },
+    didParseCell: (data) => {
+      if (data.section === "head") {
+        const idx = data.column.index;
+        if (idx === 4) data.cell.styles.fillColor = ONGOING_CELL_BG;
+        if (idx === 5) data.cell.styles.fillColor = EXEMPT_CELL_BG;
+        return;
+      }
+      if (data.section !== "body") return;
+      const idx = data.column.index;
+      if (idx === 4) data.cell.styles.fillColor = ONGOING_CELL_BG;
+      if (idx === 5) data.cell.styles.fillColor = EXEMPT_CELL_BG;
+    },
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
-  // ── Implementation Gaps ───────────────────────────────────────────────────
-  y = sectionHeading(doc, "Implementation Gaps", y);
-  autoTable(doc, {
-    startY: y,
-    head: [["Reform", "Name", "Completion Rate", "MDAs Not Complete"]],
-    body: report.leastCompletedReforms.map((r) => [
-      `Reform ${r.refNumber}`,
-      r.name,
-      pct(r.completionRate),
-      r.mdasNotDone
-        .slice(0, 12)
-        .map((m) => `${m.abbreviation || m.name} (${pct(m.score)})`)
-        .join(", ") + (r.mdasNotDone.length > 12 ? ` +${r.mdasNotDone.length - 12} more` : ""),
-    ]),
-    styles: { fontSize: 8, cellPadding: 3 },
-    headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
-    columnStyles: { 0: { cellWidth: 22 }, 2: { cellWidth: 24 } },
-    margin: { left: 14, right: 14 },
-  });
-  y = (doc as any).lastAutoTable.finalY + 8;
+  if (report.exemptionProgramNotes.length > 0) {
+    y += 2;
+    y = exemptionSectionHeading(doc, "Programme exemptions", y);
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(7);
+    doc.setTextColor(...GRAY_MID);
+    const exemptIntro = doc.splitTextToSize(
+      "Formal programme exemptions; reforms remain flagged on the tracker accordingly.",
+      pw - 28
+    );
+    doc.text(exemptIntro, 14, y);
+    y += exemptIntro.length * 4 + 5;
 
-  // ── MDA Status Distribution ───────────────────────────────────────────────
-  y = sectionHeading(doc, "MDA Status Distribution", y);
-  autoTable(doc, {
-    startY: y,
-    head: [["Status", "Count", "MDAs"]],
-    body: report.mdasByStatus.map((group) => [
-      group.label,
-      String(group.mdas.length),
-      group.mdas.map((m) => m.mda.abbreviation || m.mda.name).join(", ") || "—",
-    ]),
-    styles: { fontSize: 8, cellPadding: 3 },
-    headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
-    columnStyles: { 0: { cellWidth: 44 }, 1: { cellWidth: 14 } },
-    margin: { left: 14, right: 14 },
-  });
-  y = (doc as any).lastAutoTable.finalY + 8;
+    const accentW = 2.8;
+    const panelInnerW = pw - 28 - accentW - 10;
 
-  // ── Scoring Tiers ─────────────────────────────────────────────────────────
-  y = sectionHeading(doc, "General Scoring Tiers", y);
-  autoTable(doc, {
-    startY: y,
-    head: [["Tier", "Count", "MDAs"]],
-    body: report.mdasByTier.map((group) => [
-      group.label,
-      String(group.mdas.length),
-      group.mdas.map((m) => m.mda.abbreviation || m.mda.name).join(", ") || "—",
-    ]),
-    styles: { fontSize: 8, cellPadding: 3 },
-    headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
-    columnStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 14 } },
-    margin: { left: 14, right: 14 },
-  });
-  y = (doc as any).lastAutoTable.finalY + 8;
+    for (const note of report.exemptionProgramNotes) {
+      const lines = doc.splitTextToSize(note, panelInnerW);
+      const rowH = lines.length * 4 + 8;
 
-  // ── Cluster Performance ───────────────────────────────────────────────────
-  y = sectionHeading(doc, "Cluster Performance", y);
-  autoTable(doc, {
-    startY: y,
-    head: [["#", "Cluster", "Lead", "Score", "Status", "MDAs"]],
-    body: report.clusterPerformance.map((cluster, i) => [
-      String(i + 1),
-      cluster.name,
-      cluster.lead,
-      pct(cluster.score),
-      cluster.status.label,
-      cluster.members
-        .map((m) => m.performance?.mda.abbreviation || m.name.replace(/\s*\([^)]+\)$/, ""))
-        .join(", "),
-    ]),
-    styles: { fontSize: 7.5, cellPadding: 2.5 },
-    headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
-    columnStyles: { 0: { cellWidth: 8 }, 3: { cellWidth: 14 }, 4: { cellWidth: 30 } },
-    margin: { left: 14, right: 14 },
-  });
+      doc.setFillColor(...EXEMPT_MAGENTA_PANEL);
+      doc.roundedRect(14, y, pw - 28, rowH, 1.5, 1.5, "F");
+      doc.setFillColor(...EXEMPT_MAGENTA_ACCENT);
+      doc.rect(14, y, accentW, rowH, "F");
 
-  // ── Page numbers ──────────────────────────────────────────────────────────
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(...GRAY_DARK);
+      doc.text(lines, 14 + accentW + 5, y + 5);
+
+      y += rowH + 3;
+    }
+    y += 4;
+  }
+
   const totalPages = (doc as any).internal.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
