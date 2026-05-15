@@ -5,9 +5,9 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 import {
-  FIRST_BEEPA_COMPLETE_ABBREVIATION,
   generalReportMdaNameWithAbbrev,
   mdaHasSuperMdaBonus,
+  roundedScorePercent,
 } from "./beepa-scoring";
 import { SUPER_MDA_BONUS_NARRATIVES, type SuperMdaBonusNarrative } from "./beepa-super-bonus-narratives";
 
@@ -28,7 +28,20 @@ const EXEMPT_MAGENTA_PANEL: [number, number, number] = [253, 242, 248];
 const EXEMPT_MAGENTA_ACCENT: [number, number, number] = [219, 39, 119];
 
 function pct(v: number) {
-  return `${Math.round(v * 100)}%`;
+  return `${roundedScorePercent(v)}%`;
+}
+
+/** Matches general report tier bands; milestone / Super MDA labels pass through unchanged. */
+const PDF_SCORE_BAND_TIER_DISPLAY: Record<string, string> = {
+  Excellent: "Excellent (100%)",
+  "Very Good": "Very Good (80–99%)",
+  Good: "Good (60–79%)",
+  Fair: "Fair (50–59%)",
+  Poor: "Poor (0–49%)",
+};
+
+function tierCellForGeneralReportPdf(tierLabel: string): string {
+  return PDF_SCORE_BAND_TIER_DISPLAY[tierLabel] ?? tierLabel;
 }
 
 function addPageHeader(doc: jsPDF, title: string, subtitle: string, dateStr: string) {
@@ -163,40 +176,30 @@ export function downloadGeneralReportPDF(report: {
   });
   y += Math.ceil(stats.length / 3) * 20 + 8;
 
-  y = sectionHeading(doc, "MDAs by performance tier", y);
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(7);
-  doc.setTextColor(...GRAY_MID);
-  const tierIntro = doc.splitTextToSize(
-    `${FIRST_BEEPA_COMPLETE_ABBREVIATION} appears alone under its dedicated milestone tier (below).`,
-    pw - 28
+  type TierRow = (typeof report.mdasByPerformanceTier)[number]["mdas"][number];
+  const allMdasSorted: TierRow[] = report.mdasByPerformanceTier.flatMap((block) => block.mdas).sort(
+    (a, b) => b.score - a.score
   );
-  doc.text(tierIntro, 14, y);
-  y += tierIntro.length * 4 + 4;
 
-  for (const tierBlock of report.mdasByPerformanceTier) {
-    if (tierBlock.mdas.length === 0) continue;
-    y = sectionHeading(doc, tierBlock.label, y + 2);
-    autoTable(doc, {
-      startY: y,
-      head: [["MDA", "Score", "Status"]],
-      body: tierBlock.mdas.map((item) => [
-        generalReportMdaNameWithAbbrev(item.mda),
-        pct(item.score),
-        item.status.label,
-      ]),
-      styles: { fontSize: 8, cellPadding: 3 },
-      headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      columnStyles: {
-        0: { cellWidth: 88 },
-        1: { cellWidth: 22 },
-        2: { cellWidth: 56 },
-      },
-      margin: { left: 14, right: 14 },
-    });
-    y = (doc as any).lastAutoTable.finalY + 8;
-  }
+  autoTable(doc, {
+    startY: y,
+    head: [["MDA", "Score", "Tier"]],
+    body: allMdasSorted.map((item) => [
+      generalReportMdaNameWithAbbrev(item.mda),
+      pct(item.score),
+      tierCellForGeneralReportPdf(item.tier.label),
+    ]),
+    styles: { fontSize: 8, cellPadding: 3 },
+    headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { cellWidth: 62 },
+      1: { cellWidth: 18 },
+      2: { cellWidth: 94 },
+    },
+    margin: { left: 14, right: 14 },
+  });
+  y = (doc as any).lastAutoTable.finalY + 8;
 
   const seenBonusMda = new Set<string>();
   const bonusNarrativeBlocks: Array<{ name: string; abbrev: string; narrative: SuperMdaBonusNarrative }> = [];

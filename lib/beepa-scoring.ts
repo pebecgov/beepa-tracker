@@ -134,9 +134,9 @@ export const NRS_REFORM_THREE_EXEMPTION_NOTE =
 export const BEEPA_PROGRAMME_EXEMPTION_NOTES: readonly string[] = [
   "Patents & Designs Registry (PDR): exemption — issues with developers delaying compliant tracker delivery.",
   "Trade Marks Registry: exemption — issues with developers delaying compliant tracker delivery.",
-  "Bank of Agriculture (BOA): exempt — not originally part of BEEPA; agency is being added now, so reforms treated as exempt pending onboarding.",
-  "NAIC: exemption — operational disruption following a fire outbreak affecting offices.",
-  "Nigeria Revenue Service (NRS): exemptions reflect ongoing national tax reform.",
+  "Bank of Agriculture (BOA): exemption — not in the original BEEPA cohort; agency added to the programme thereafter.",
+  "Nigerian Agricultural Insurance Corporation (NAIC): exemption — operational disruption following a fire outbreak affecting offices.",
+  "Nigeria Revenue Service (NRS): exemptions due to ongoing national tax reform.",
 ];
 
 /** Super MDA bonus roster (empty = no Super MDA tier active). Re-add abbreviations here when re-enabled. */
@@ -163,29 +163,35 @@ export function mdaHasSuperMdaBonus(mda: { abbreviation?: string | null }): bool
   return (SUPER_MDA_BONUS_ABBREVIATIONS as readonly string[]).includes(upper);
 }
 
+/** Same formula everywhere we show `Math.round(score × 100)%` — tiers use this so e.g. 60% → Good. */
+export function roundedScorePercent(score: number): number {
+  return Math.round(score * 100);
+}
+
 export function scoreTierBandOnly(score: number): ScorecardTier {
-  if (score >= 0.995) {
+  const p = roundedScorePercent(score);
+  if (p >= 100) {
     return {
       label: "Excellent",
       description: "100% of applicable BEEPA reform weighted implementation.",
       color: "blue",
     };
   }
-  if (score >= 0.8) {
+  if (p >= 80) {
     return {
       label: "Very Good",
       description: "Strong reform implementation with residual gaps.",
       color: "blue",
     };
   }
-  if (score >= 0.6) {
+  if (p >= 60) {
     return {
       label: "Good",
       description: "Solid progress across reforms.",
       color: "blue",
     };
   }
-  if (score >= 0.5) {
+  if (p >= 50) {
     return {
       label: "Fair",
       description: "Meaningful but uneven implementation.",

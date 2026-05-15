@@ -227,12 +227,7 @@ export default function GeneralReportPage() {
         </section>
 
         <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-6 py-5 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">MDAs by performance tier</h2>
-            <p className="text-sm text-gray-500 mt-1">
-              <span className="font-semibold">{FIRST_BEEPA_COMPLETE_ABBREVIATION}</span> appears alone under the milestone tier row below.
-            </p>
-          </div>
+       
           <div className="divide-y divide-gray-100">
             {mdasByPerformanceTier.map((tierBlock) =>
               tierBlock.mdas.length === 0 ? null : (
