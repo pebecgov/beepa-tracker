@@ -167,9 +167,9 @@ export default function MDAScorecardPage({ params }: MDAScorecardPageProps) {
                 </p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wider text-gray-500">Exclusions</p>
+                <p className="text-xs uppercase tracking-wider text-gray-500">Exceptions</p>
                 <p className="text-xl font-semibold text-gray-900">
-                  {summary.excludedReformCount} reforms, {summary.excludedActivityCount} activities
+                  {summary.exceptionReformCount} reforms, {summary.exceptionActivityCount} activities
                 </p>
               </div>
             </div>
@@ -241,7 +241,7 @@ export default function MDAScorecardPage({ params }: MDAScorecardPageProps) {
                       {row.countsTowardOverall ? (
                         <span className="text-sm font-medium text-green-800">Included</span>
                       ) : (
-                        <span className="text-sm font-medium text-amber-800">Exempted</span>
+                        <span className="text-sm font-medium text-amber-800">Exception</span>
                       )}
                     </td>
                   </tr>
@@ -268,7 +268,7 @@ export default function MDAScorecardPage({ params }: MDAScorecardPageProps) {
                     </h3>
                     {!row.countsTowardOverall && (
                       <p className="text-sm text-amber-800 mt-1">
-                        This reform is exempted from the MDA&apos;s overall score.
+                        This reform is under exception and not included in the MDA&apos;s overall score.
                       </p>
                     )}
                   </div>
@@ -306,7 +306,7 @@ export default function MDAScorecardPage({ params }: MDAScorecardPageProps) {
                             {activity.countsTowardScore ? (
                               <span className="text-green-800">Included</span>
                             ) : (
-                              <span className="text-amber-800">Exempted</span>
+                              <span className="text-amber-800">Exception</span>
                             )}
                           </td>
                         </tr>

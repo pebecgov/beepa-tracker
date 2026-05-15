@@ -58,8 +58,8 @@ export interface ReformPerformance {
   score: number;
   status: Status;
   activityCount: number;
-  /** Activities listed under this reform but excluded from score for this MDA */
-  exemptActivityCount?: number;
+  /** Activities listed under this reform but under scoring exception for this MDA */
+  exceptionActivityCount?: number;
   completedCount: number;
   activities?: Activity[];
 }

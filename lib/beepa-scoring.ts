@@ -90,7 +90,7 @@ export function reformCountsTowardMdaScore(
 }
 
 /**
- * Returns false for activities that are excluded from an MDA's score.
+ * Returns false for activities that are under scoring exception for an MDA.
  * NIS Reform 6: excludes activities 6.6 and 6.7.
  * SERVICOM Reform 7: excludes activity 7.2.
  * SERVICOM Reform 2: excludes activities 2.9 and 2.10.
@@ -123,20 +123,17 @@ export function activityCountsTowardMdaScore(
   return true;
 }
 
-/** Abbreviation recorded as first MDA to complete the full BEEPA exercise (report column). */
-export const FIRST_BEEPA_COMPLETE_ABBREVIATION = "NAQS";
+/** Nigeria Revenue Service — Reform 3 scoring exception (tax reform statutory extension). Shown on reform summaries / PDF. */
+export const NRS_REFORM_THREE_EXCEPTION_NOTE =
+  "NRS exception from Reform 3 scoring: statutory timeline extension under national tax reform implementation.";
 
-/** Nigeria Revenue Service — Reform 3 excluded (tax reform statutory extension). Shown on reform summaries / PDF. */
-export const NRS_REFORM_THREE_EXEMPTION_NOTE =
-  "NRS exempt from Reform 3 scoring: statutory timeline extension under national tax reform implementation.";
-
-/** Programme exemption narratives — general report « Programme exemptions » panel / PDF. */
-export const BEEPA_PROGRAMME_EXEMPTION_NOTES: readonly string[] = [
-  "Patents & Designs Registry (PDR): exemption — issues with developers delaying compliant tracker delivery.",
-  "Trade Marks Registry: exemption — issues with developers delaying compliant tracker delivery.",
-  "Bank of Agriculture (BOA): exemption — not in the original BEEPA cohort; agency added to the programme thereafter.",
-  "Nigerian Agricultural Insurance Corporation (NAIC): exemption — operational disruption following a fire outbreak affecting offices.",
-  "Nigeria Revenue Service (NRS): exemptions due to ongoing national tax reform.",
+/** Programme exception narratives — general report « Programme exceptions » panel / PDF. */
+export const BEEPA_PROGRAMME_EXCEPTION_NOTES: readonly string[] = [
+  "Patents & Designs Registry (PDR) was granted an exception from participation in the BEEPA exercise due to ongoing challenges with its online registration platform and internal operational issues affecting processes and service delivery; as a result it could not participate effectively during the assessment period.",
+  "Trade Marks Registry was granted an exception from participation in the BEEPA exercise due to ongoing challenges with its online registration platform and internal operational issues affecting processes and service delivery; as a result it could not participate effectively during the assessment period.",
+  "Bank of Agriculture (BOA) was granted an exception to participate in a subsequent BEEPA implementation cycle, having not been included at the commencement of the current programme timeline.",
+  "Nigerian Agricultural Insurance Corporation (NAIC) was granted an exception to participate in a subsequent BEEPA implementation cycle following the fire incident which significantly impacted its ICT infrastructure and operational capacity.",
+  "Nigeria Revenue Service (NRS) was granted an exception in light of the ongoing tax reform processes currently being undertaken by the Service.",
 ];
 
 /** Super MDA bonus roster (empty = no Super MDA tier active). Re-add abbreviations here when re-enabled. */
@@ -152,10 +149,6 @@ export type ScorecardTier = {
 export const EXCEPTIONAL_SUPER_MDA_TIER_LABEL =
   "Exceptional performance (Super MDA) — Submission of evidence for bonus point";
 
-/** Programme milestone row — first agency to complete BEEPA (separate from score bands). */
-export const FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL =
-  "First BEEPA completion (programme milestone)";
-
 export function mdaHasSuperMdaBonus(mda: { abbreviation?: string | null }): boolean {
   const a = mda.abbreviation?.trim();
   if (!a) return false;
@@ -163,35 +156,35 @@ export function mdaHasSuperMdaBonus(mda: { abbreviation?: string | null }): bool
   return (SUPER_MDA_BONUS_ABBREVIATIONS as readonly string[]).includes(upper);
 }
 
-/** Same formula everywhere we show `Math.round(score × 100)%` — tiers use this so e.g. 60% → Good. */
-export function roundedScorePercent(score: number): number {
+/** Rounded score percent (0–100), aligned with displayed scores in the UI and reports. */
+export function beepaScorePercentRounded(score: number): number {
   return Math.round(score * 100);
 }
 
 export function scoreTierBandOnly(score: number): ScorecardTier {
-  const p = roundedScorePercent(score);
-  if (p >= 100) {
+  const pct = beepaScorePercentRounded(score);
+  if (pct >= 100) {
     return {
       label: "Excellent",
       description: "100% of applicable BEEPA reform weighted implementation.",
       color: "blue",
     };
   }
-  if (p >= 80) {
+  if (pct >= 80) {
     return {
       label: "Very Good",
       description: "Strong reform implementation with residual gaps.",
       color: "blue",
     };
   }
-  if (p >= 60) {
+  if (pct >= 60) {
     return {
       label: "Good",
       description: "Solid progress across reforms.",
       color: "blue",
     };
   }
-  if (p >= 50) {
+  if (pct >= 50) {
     return {
       label: "Fair",
       description: "Meaningful but uneven implementation.",
@@ -230,6 +223,21 @@ export function getScorecardTierForMda(
       "NAICOM — bonus-eligible Super MDA; reform tracker score still building toward full completion.",
     color: "green",
   };
+}
+
+/** Percent ranges for standard score bands (matches rounded `scoreTierBandOnly` thresholds). */
+const SCORE_TIER_PERCENT_RANGES: Record<string, string> = {
+  Excellent: "100%",
+  "Very Good": "80–99%",
+  Good: "60–79%",
+  Fair: "50–59%",
+  Poor: "0–49%",
+};
+
+/** Tier label with percent range in brackets — for PDF and other formal exports. */
+export function tierLabelWithPercentRange(label: string): string {
+  const range = SCORE_TIER_PERCENT_RANGES[label];
+  return range ? `${label} (${range})` : label;
 }
 
 /** General report tier tables: full name with abbreviation when present. */

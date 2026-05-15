@@ -14,8 +14,6 @@ import { useAppUser } from "@/components/UserProvider";
 import { Status } from "@/lib/types";
 import {
   EXCEPTIONAL_SUPER_MDA_TIER_LABEL,
-  FIRST_BEEPA_COMPLETE_ABBREVIATION,
-  FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL,
   generalReportMdaNameWithAbbrev,
   mdaHasSuperMdaBonus,
 } from "@/lib/beepa-scoring";
@@ -28,9 +26,7 @@ function TierBadge({ label }: { label: string }) {
   const className =
     label === EXCEPTIONAL_SUPER_MDA_TIER_LABEL
       ? "bg-green-100 text-green-800"
-      : label === FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL
-        ? "bg-blue-100 text-blue-800"
-        : label === "Excellent" || label === "Very Good" || label === "Good"
+      : label === "Excellent" || label === "Very Good" || label === "Good"
         ? "bg-blue-100 text-blue-800"
         : label === "Fair"
           ? "bg-yellow-100 text-yellow-800"
@@ -142,7 +138,12 @@ export default function GeneralReportPage() {
     );
   }
 
-  const { summary, mdasByPerformanceTier, reformAreasCompletion, exemptionProgramNotes } = report;
+  const {
+    summary,
+    mdasByPerformanceTier,
+    reformAreasCompletion,
+    exceptionProgramNotes,
+  } = report;
 
   const seenBonusMda = new Set<string>();
   const bonusNarrativeBlocks: Array<{ abbrev: string; name: string; narrative: SuperMdaBonusNarrative }> = [];
@@ -202,10 +203,6 @@ export default function GeneralReportPage() {
             MDAs are grouped by weighted tracker score: Excellent 100% · Very Good 80–99% · Good 60–79% · Fair 50–59% · Poor
             0–49%. Groupings are not a league table.
           </p>
-          <p className="mt-2 text-amber-950/90">
-            <span className="font-semibold">{FIRST_BEEPA_COMPLETE_ABBREVIATION}</span> appears separately under «{" "}
-            {FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL} » as the first MDA recorded to complete the full BEEPA exercise.
-          </p>
         </section>
 
         <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -227,7 +224,10 @@ export default function GeneralReportPage() {
         </section>
 
         <section className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-       
+          <div className="px-6 py-5 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">MDAs by performance tier</h2>
+            <p className="text-sm text-gray-500 mt-1">Bands reflect applicable weighted reform completion only.</p>
+          </div>
           <div className="divide-y divide-gray-100">
             {mdasByPerformanceTier.map((tierBlock) =>
               tierBlock.mdas.length === 0 ? null : (
@@ -303,7 +303,7 @@ export default function GeneralReportPage() {
             <p className="text-sm text-gray-500 mt-1">
               Completion counts applicable MDAs only. Columns{" "}
               <span className="rounded bg-amber-100 px-1 font-medium text-amber-900">Ongoing</span> and{" "}
-              <span className="rounded bg-violet-100 px-1 font-medium text-violet-900">Exempt</span> use distinct
+              <span className="rounded bg-violet-100 px-1 font-medium text-violet-900">Exception</span> use distinct
               styling (matches PDF).
             </p>
           </div>
@@ -316,7 +316,7 @@ export default function GeneralReportPage() {
                   <th className="px-4 py-3 text-left font-semibold text-gray-900">Completion</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-900">Complete</th>
                   <th className="px-4 py-3 text-left font-semibold text-amber-950 bg-amber-50">Ongoing</th>
-                  <th className="px-4 py-3 text-left font-semibold text-violet-950 bg-violet-50">Exempt</th>
+                  <th className="px-4 py-3 text-left font-semibold text-violet-950 bg-violet-50">Exception</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 bg-white">
@@ -334,7 +334,7 @@ export default function GeneralReportPage() {
                       {row.completedMdaCount}/{row.applicableMdaCount}
                     </td>
                     <td className="px-4 py-3 bg-amber-50/90 font-medium text-amber-950">{row.ongoingMdaCount}</td>
-                    <td className="px-4 py-3 bg-violet-50/90 font-medium text-violet-950">{row.exemptMdaCount}</td>
+                    <td className="px-4 py-3 bg-violet-50/90 font-medium text-violet-950">{row.exceptionMdaCount}</td>
                   </tr>
                 ))}
               </tbody>
@@ -342,21 +342,21 @@ export default function GeneralReportPage() {
           </div>
         </section>
 
-        {exemptionProgramNotes.length > 0 && (
-          <section className="rounded-xl overflow-hidden border-2 border-fuchsia-700 shadow-lg shadow-fuchsia-950/15 ring-1 ring-fuchsia-400/30">
-            <div className="bg-linear-to-r from-fuchsia-800 via-fuchsia-700 to-pink-700 px-6 py-4">
-              <h2 className="text-lg font-bold tracking-wide text-white">Programme exemptions</h2>
-              <p className="mt-1.5 text-sm leading-snug text-fuchsia-100/95">
-                Formal exemptions affecting tracker scoring and reform applicability — distinct from standard tier grouping.
+        {exceptionProgramNotes.length > 0 && (
+          <section className="rounded-xl overflow-hidden border-2 border-violet-700 shadow-lg shadow-violet-950/15 ring-1 ring-violet-400/30">
+            <div className="bg-linear-to-r from-violet-800 via-violet-700 to-indigo-700 px-6 py-4">
+              <h2 className="text-lg font-bold tracking-wide text-white">Programme exceptions</h2>
+              <p className="mt-1.5 text-sm leading-snug text-violet-100/95">
+                Formal programme exceptions affecting tracker scoring and reform applicability — distinct from standard tier grouping.
               </p>
             </div>
-            <div className="space-y-3 bg-linear-to-b from-fuchsia-50 to-pink-50 px-5 py-5 border-t border-fuchsia-300/60">
-              {exemptionProgramNotes.map((note, i) => (
+            <div className="space-y-3 bg-linear-to-b from-violet-50 to-indigo-50 px-5 py-5 border-t border-violet-300/60">
+              {exceptionProgramNotes.map((note, i) => (
                 <div
                   key={i}
-                  className="flex gap-0 overflow-hidden rounded-lg border border-fuchsia-200 bg-white shadow-sm"
+                  className="flex gap-0 overflow-hidden rounded-lg border border-violet-200 bg-white shadow-sm"
                 >
-                  <div className="w-1.5 shrink-0 bg-linear-to-b from-fuchsia-600 to-pink-600" aria-hidden />
+                  <div className="w-1.5 shrink-0 bg-linear-to-b from-violet-600 to-indigo-600" aria-hidden />
                   <p className="flex-1 py-3.5 pr-4 pl-4 text-sm leading-relaxed text-gray-800">{note}</p>
                 </div>
               ))}

@@ -123,19 +123,19 @@ export default function MDAPage({ params }: MDAPageProps) {
             {mda.abbreviation === "NCC" && (
               <p className="text-xs text-gray-600 mb-2">
                 Based on reforms 1, 2, 3, 5, and 7 only. Reforms 4 and 6 are not applicable to NCC and
-                are excluded from this score.
+                are under exception and not counted in this score.
               </p>
             )}
             {mda.abbreviation === "GBB" && (
               <p className="text-xs text-gray-600 mb-2">
                 Based on reforms 1, 2, 3, and 7 only. Reforms 4, 5, and 6 are not applicable to Galaxy
-                Backbone Limited and are excluded from this score.
+                Backbone Limited and are under exception for this score.
               </p>
             )}
             {mda.abbreviation === "NIS" && (
               <p className="text-xs text-gray-600 mb-2">
                 Based on all 7 reforms. Within Reform 6, activities 6.6 and 6.7 are not applicable to
-                NIS and are excluded from Reform 6&apos;s weighted score.
+                NIS and are under exception for Reform 6&apos;s weighted score.
               </p>
             )}
             {partialReformScoreBreakdown && (
@@ -207,7 +207,7 @@ export default function MDAPage({ params }: MDAPageProps) {
                 </p>
                 <p className="text-xs text-gray-600 mb-3">
                   The headline score above covers all 7 reforms. Within Reform 6, activities 6.6 and
-                  6.7 are excluded from the weighted score — they are not applicable to NIS.
+                  6.7 are under exception for the weighted score — they are not applicable to NIS.
                 </p>
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs border-collapse">
@@ -229,7 +229,7 @@ export default function MDAPage({ params }: MDAPageProps) {
                             <td className="py-1.5 pr-2 tabular-nums">{formatScore(r.score)}</td>
                             <td className="py-1.5">
                               {r.reform.refNumber === 6 ? (
-                                <span className="text-amber-800">Activities 6.6 &amp; 6.7 excluded</span>
+                                <span className="text-amber-800">Activities 6.6 &amp; 6.7 — exception</span>
                               ) : (
                                 <span className="text-green-800">All activities included</span>
                               )}
@@ -324,10 +324,10 @@ export default function MDAPage({ params }: MDAPageProps) {
                       </span>
                       <span className="text-sm text-gray-500">
                         {reformPerf.completedCount}/{reformPerf.activityCount} scoring activities
-                        {(reformPerf.exemptActivityCount ?? 0) > 0 ? (
+                        {(reformPerf.exceptionActivityCount ?? 0) > 0 ? (
                           <span className="text-amber-800 font-medium">
                             {" "}
-                            · {reformPerf.exemptActivityCount} exempt
+                            · {reformPerf.exceptionActivityCount} exception
                           </span>
                         ) : null}
                       </span>
@@ -418,7 +418,7 @@ function ActivitiesList({
       : true;
 
   const applicableActivities = sortedActivities.filter((a) => activityCountsTowardScore(a.refNumber));
-  const exemptActivities = sortedActivities.filter((a) => !activityCountsTowardScore(a.refNumber));
+  const exceptionActivities = sortedActivities.filter((a) => !activityCountsTowardScore(a.refNumber));
   const scoringActivitiesComplete = applicableActivities.filter((a) => a.status === "complete").length;
 
   return (
@@ -435,12 +435,12 @@ function ActivitiesList({
       {/* Activities */}
       <div className="divide-y divide-gray-100">
         {sortedActivities.map((activity) => {
-          const isExemptFromScore = !activityCountsTowardScore(activity.refNumber);
+          const isActivityException = !activityCountsTowardScore(activity.refNumber);
           return (
           <div
             key={activity._id}
             className={`px-5 py-4 grid grid-cols-12 gap-4 items-center hover:bg-gray-50 transition-colors ${
-              isExemptFromScore ? "bg-amber-50/70 border-l-4 border-amber-400" : ""
+              isActivityException ? "bg-amber-50/70 border-l-4 border-amber-400" : ""
             }`}
           >
             {/* Ref Number */}
@@ -453,9 +453,9 @@ function ActivitiesList({
             {/* Activity Name */}
             <div className="col-span-4">
               <p className="text-sm text-gray-900 leading-tight">{activity.name}</p>
-              {isExemptFromScore && (
+              {isActivityException && (
                   <span className="inline-flex items-center rounded-md bg-amber-200 px-2 py-0.5 text-xs font-semibold text-amber-950 mt-1.5">
-                    Exempted — not counted in BEEPA score
+                    Exception — not counted in BEEPA score
                   </span>
               )}
             </div>
@@ -523,11 +523,12 @@ function ActivitiesList({
         <div className="flex items-center gap-4">
           <span className="text-gray-500">
             {scoringActivitiesComplete} of {applicableActivities.length} scoring activities complete
-            {exemptActivities.length > 0 ? (
+            {exceptionActivities.length > 0 ? (
               <span className="text-amber-950 font-medium">
                 {" "}
-                ({exemptActivities.length} exempt{": "}
-                {exemptActivities.map((a) => a.refNumber).join(", ")})
+                ({exceptionActivities.length} exception{exceptionActivities.length === 1 ? "" : "s"}
+                {": "}
+                {exceptionActivities.map((a) => a.refNumber).join(", ")})
               </span>
             ) : null}
           </span>

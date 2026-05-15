@@ -1,4 +1,3 @@
-import { roundedScorePercent } from "./beepa-scoring";
 import { Status, StatusLabel, StatusColor } from "./types";
 
 // Status thresholds configuration (matching Excel formula)
@@ -27,7 +26,7 @@ export function getStatus(score: number): Status {
  * Format score as percentage string
  */
 export function formatScore(score: number): string {
-  return `${roundedScorePercent(score)}%`;
+  return `${Math.round(score * 100)}%`;
 }
 
 /**

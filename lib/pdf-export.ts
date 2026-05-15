@@ -7,7 +7,7 @@ import autoTable from "jspdf-autotable";
 import {
   generalReportMdaNameWithAbbrev,
   mdaHasSuperMdaBonus,
-  roundedScorePercent,
+  tierLabelWithPercentRange,
 } from "./beepa-scoring";
 import { SUPER_MDA_BONUS_NARRATIVES, type SuperMdaBonusNarrative } from "./beepa-super-bonus-narratives";
 
@@ -20,28 +20,15 @@ const GRAY_LIGHT: [number, number, number] = [243, 244, 246];
 const WHITE: [number, number, number] = [255, 255, 255];
 /** Reform table: MDAs with reform in progress */
 const ONGOING_CELL_BG: [number, number, number] = [254, 243, 199];
-/** Reform table: MDAs exempt from reform scoring */
-const EXEMPT_CELL_BG: [number, number, number] = [237, 233, 254];
-/** Programme exemptions section (distinct from score/report sections). */
-const EXEMPT_MAGENTA: [number, number, number] = [157, 23, 77];
-const EXEMPT_MAGENTA_PANEL: [number, number, number] = [253, 242, 248];
-const EXEMPT_MAGENTA_ACCENT: [number, number, number] = [219, 39, 119];
+/** Reform table: MDAs under scoring exception for a reform */
+const EXCEPTION_CELL_BG: [number, number, number] = [237, 233, 254];
+/** Programme exceptions section (distinct from score/report sections). */
+const EXCEPTION_VIOLET: [number, number, number] = [91, 33, 182];
+const EXCEPTION_VIOLET_PANEL: [number, number, number] = [245, 243, 255];
+const EXCEPTION_VIOLET_ACCENT: [number, number, number] = [124, 58, 237];
 
 function pct(v: number) {
-  return `${roundedScorePercent(v)}%`;
-}
-
-/** Matches general report tier bands; milestone / Super MDA labels pass through unchanged. */
-const PDF_SCORE_BAND_TIER_DISPLAY: Record<string, string> = {
-  Excellent: "Excellent (100%)",
-  "Very Good": "Very Good (80–99%)",
-  Good: "Good (60–79%)",
-  Fair: "Fair (50–59%)",
-  Poor: "Poor (0–49%)",
-};
-
-function tierCellForGeneralReportPdf(tierLabel: string): string {
-  return PDF_SCORE_BAND_TIER_DISPLAY[tierLabel] ?? tierLabel;
+  return `${Math.round(v * 100)}%`;
 }
 
 function addPageHeader(doc: jsPDF, title: string, subtitle: string, dateStr: string) {
@@ -90,15 +77,41 @@ function sectionHeading(doc: jsPDF, text: string, y: number) {
   return y + 11;
 }
 
-function exemptionSectionHeading(doc: jsPDF, text: string, y: number) {
+function exceptionSectionHeading(doc: jsPDF, text: string, y: number) {
   const pw = doc.internal.pageSize.getWidth();
-  doc.setFillColor(...EXEMPT_MAGENTA);
+  doc.setFillColor(...EXCEPTION_VIOLET);
   doc.rect(14, y, pw - 28, 7, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
   doc.setTextColor(...WHITE);
   doc.text(text.toUpperCase(), 17, y + 5);
   return y + 11;
+}
+
+function programmeNotePanels(
+  doc: jsPDF,
+  y: number,
+  pw: number,
+  notes: string[],
+  panelColor: [number, number, number],
+  accentColor: [number, number, number]
+) {
+  const accentW = 2.8;
+  const panelInnerW = pw - 28 - accentW - 10;
+  for (const note of notes) {
+    const lines = doc.splitTextToSize(note, panelInnerW);
+    const rowH = lines.length * 4 + 8;
+    doc.setFillColor(...panelColor);
+    doc.roundedRect(14, y, pw - 28, rowH, 1.5, 1.5, "F");
+    doc.setFillColor(...accentColor);
+    doc.rect(14, y, accentW, rowH, "F");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...GRAY_DARK);
+    doc.text(lines, 14 + accentW + 5, y + 5);
+    y += rowH + 3;
+  }
+  return y + 4;
 }
 
 // ─── General Report PDF ───────────────────────────────────────────────────────
@@ -126,10 +139,10 @@ export function downloadGeneralReportPDF(report: {
     applicableMdaCount: number;
     completedMdaCount: number;
     ongoingMdaCount: number;
-    exemptMdaCount: number;
+    exceptionMdaCount: number;
     completionRate: number;
   }>;
-  exemptionProgramNotes: string[];
+  exceptionProgramNotes: string[];
 }) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
@@ -176,30 +189,31 @@ export function downloadGeneralReportPDF(report: {
   });
   y += Math.ceil(stats.length / 3) * 20 + 8;
 
-  type TierRow = (typeof report.mdasByPerformanceTier)[number]["mdas"][number];
-  const allMdasSorted: TierRow[] = report.mdasByPerformanceTier.flatMap((block) => block.mdas).sort(
-    (a, b) => b.score - a.score
-  );
+  y = sectionHeading(doc, "MDAs by performance tier", y);
 
-  autoTable(doc, {
-    startY: y,
-    head: [["MDA", "Score", "Tier"]],
-    body: allMdasSorted.map((item) => [
-      generalReportMdaNameWithAbbrev(item.mda),
-      pct(item.score),
-      tierCellForGeneralReportPdf(item.tier.label),
-    ]),
-    styles: { fontSize: 8, cellPadding: 3 },
-    headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
-    alternateRowStyles: { fillColor: [248, 250, 252] },
-    columnStyles: {
-      0: { cellWidth: 62 },
-      1: { cellWidth: 18 },
-      2: { cellWidth: 94 },
-    },
-    margin: { left: 14, right: 14 },
-  });
-  y = (doc as any).lastAutoTable.finalY + 8;
+  for (const tierBlock of report.mdasByPerformanceTier) {
+    if (tierBlock.mdas.length === 0) continue;
+    y = sectionHeading(doc, tierLabelWithPercentRange(tierBlock.label), y + 2);
+    autoTable(doc, {
+      startY: y,
+      head: [["MDA", "Score", "Status"]],
+      body: tierBlock.mdas.map((item) => [
+        generalReportMdaNameWithAbbrev(item.mda),
+        pct(item.score),
+        item.status.label,
+      ]),
+      styles: { fontSize: 8, cellPadding: 3 },
+      headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: {
+        0: { cellWidth: 88 },
+        1: { cellWidth: 22 },
+        2: { cellWidth: 56 },
+      },
+      margin: { left: 14, right: 14 },
+    });
+    y = (doc as any).lastAutoTable.finalY + 8;
+  }
 
   const seenBonusMda = new Set<string>();
   const bonusNarrativeBlocks: Array<{ name: string; abbrev: string; narrative: SuperMdaBonusNarrative }> = [];
@@ -276,14 +290,14 @@ export function downloadGeneralReportPDF(report: {
   y = sectionHeading(doc, "Reform areas and completion rate", y);
   autoTable(doc, {
     startY: y,
-    head: [["Ref", "Reform", "Completion", "Complete", "Ongoing", "Exempt"]],
+    head: [["Ref", "Reform", "Completion", "Complete", "Ongoing", "Exception"]],
     body: report.reformAreasCompletion.map((r) => [
       `R${r.refNumber}`,
       r.name,
       pct(r.completionRate),
       `${r.completedMdaCount}/${r.applicableMdaCount}`,
       String(r.ongoingMdaCount),
-      String(r.exemptMdaCount),
+      String(r.exceptionMdaCount),
     ]),
     styles: { fontSize: 8, cellPadding: 3 },
     headStyles: {
@@ -309,7 +323,7 @@ export function downloadGeneralReportPDF(report: {
           data.cell.styles.textColor = GRAY_DARK;
         }
         if (idx === 5) {
-          data.cell.styles.fillColor = EXEMPT_CELL_BG;
+          data.cell.styles.fillColor = EXCEPTION_CELL_BG;
           data.cell.styles.textColor = GRAY_DARK;
         }
         return;
@@ -317,44 +331,33 @@ export function downloadGeneralReportPDF(report: {
       if (data.section !== "body") return;
       const idx = data.column.index;
       if (idx === 4) data.cell.styles.fillColor = ONGOING_CELL_BG;
-      if (idx === 5) data.cell.styles.fillColor = EXEMPT_CELL_BG;
+      if (idx === 5) data.cell.styles.fillColor = EXCEPTION_CELL_BG;
     },
   });
   y = (doc as any).lastAutoTable.finalY + 8;
 
-  if (report.exemptionProgramNotes.length > 0) {
+  const exceptionProgramNotes = report.exceptionProgramNotes ?? [];
+  if (exceptionProgramNotes.length > 0) {
     y += 2;
-    y = exemptionSectionHeading(doc, "Programme exemptions", y);
+    y = exceptionSectionHeading(doc, "Programme exceptions", y);
     doc.setFont("helvetica", "italic");
     doc.setFontSize(7);
     doc.setTextColor(...GRAY_MID);
-    const exemptIntro = doc.splitTextToSize(
-      "Formal programme exemptions; reforms remain flagged on the tracker accordingly.",
+    const exceptionIntro = doc.splitTextToSize(
+      "Formal programme exceptions affecting tracker scoring and reform applicability.",
       pw - 28
     );
-    doc.text(exemptIntro, 14, y);
-    y += exemptIntro.length * 4 + 5;
+    doc.text(exceptionIntro, 14, y);
+    y += exceptionIntro.length * 4 + 5;
 
-    const accentW = 2.8;
-    const panelInnerW = pw - 28 - accentW - 10;
-
-    for (const note of report.exemptionProgramNotes) {
-      const lines = doc.splitTextToSize(note, panelInnerW);
-      const rowH = lines.length * 4 + 8;
-
-      doc.setFillColor(...EXEMPT_MAGENTA_PANEL);
-      doc.roundedRect(14, y, pw - 28, rowH, 1.5, 1.5, "F");
-      doc.setFillColor(...EXEMPT_MAGENTA_ACCENT);
-      doc.rect(14, y, accentW, rowH, "F");
-
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.setTextColor(...GRAY_DARK);
-      doc.text(lines, 14 + accentW + 5, y + 5);
-
-      y += rowH + 3;
-    }
-    y += 4;
+    y = programmeNotePanels(
+      doc,
+      y,
+      pw,
+      exceptionProgramNotes,
+      EXCEPTION_VIOLET_PANEL,
+      EXCEPTION_VIOLET_ACCENT
+    );
   }
 
   const totalPages = (doc as any).internal.getNumberOfPages();
@@ -389,8 +392,8 @@ export function downloadScorecardPDF(scorecard: {
     inProgressActivities: number;
     notStartedActivities: number;
     completionRate: number;
-    excludedReformCount: number;
-    excludedActivityCount: number;
+    exceptionReformCount: number;
+    exceptionActivityCount: number;
   };
   weakestReforms: Array<{ refNumber: number; name: string; score: number }>;
   reformRows: Array<{
@@ -426,7 +429,7 @@ export function downloadScorecardPDF(scorecard: {
   addPageHeader(
     doc,
     `Individual MDA Scorecard: ${mdaLabel}`,
-    `Tier: ${scorecard.tier.label}  ·  Status: ${scorecard.status.label}  ·  Score: ${pct(scorecard.score)}`,
+    `Tier: ${tierLabelWithPercentRange(scorecard.tier.label)}  ·  Status: ${scorecard.status.label}  ·  Score: ${pct(scorecard.score)}`,
     `Generated: ${generatedDate}`
   );
 
@@ -435,11 +438,11 @@ export function downloadScorecardPDF(scorecard: {
   // ── Summary stat boxes ────────────────────────────────────────────────────
   const stats = [
     { label: "Overall Score", value: pct(scorecard.score) },
-    { label: "Tier", value: scorecard.tier.label },
+    { label: "Tier", value: tierLabelWithPercentRange(scorecard.tier.label) },
     { label: "Applicable Reforms", value: `${scorecard.summary.scoringReformCount} / ${scorecard.summary.reformCount}` },
     { label: "Activities Complete", value: `${scorecard.summary.completedActivities} / ${scorecard.summary.totalApplicableActivities}` },
     { label: "Completion Rate", value: pct(scorecard.summary.completionRate) },
-    { label: "Exclusions", value: `${scorecard.summary.excludedReformCount}R / ${scorecard.summary.excludedActivityCount}A` },
+    { label: "Exceptions", value: `${scorecard.summary.exceptionReformCount}R / ${scorecard.summary.exceptionActivityCount}A` },
   ];
   const boxW = (pw - 28) / 6;
   stats.forEach((stat, i) => {
@@ -489,7 +492,7 @@ export function downloadScorecardPDF(scorecard: {
       String(row.completedCount),
       String(row.inProgressCount),
       String(row.notStartedCount),
-      row.countsTowardOverall ? "Yes" : "Exempt",
+      row.countsTowardOverall ? "Yes" : "Exception",
     ]),
     styles: { fontSize: 8, cellPadding: 2.5 },
     headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
@@ -508,7 +511,7 @@ export function downloadScorecardPDF(scorecard: {
 
   // ── Activity Evidence (one table per reform) ───────────────────────────────
   for (const row of scorecard.reformRows) {
-    const heading = `Reform ${row.reform.refNumber}: ${row.reform.name}${!row.countsTowardOverall ? "  (Exempted from overall score)" : ""}`;
+    const heading = `Reform ${row.reform.refNumber}: ${row.reform.name}${!row.countsTowardOverall ? "  (Exception — not in overall score)" : ""}`;
     y = sectionHeading(doc, heading, y);
     autoTable(doc, {
       startY: y,
@@ -523,7 +526,7 @@ export function downloadScorecardPDF(scorecard: {
           : act.status === "in_progress"
             ? "In Progress"
             : "Not Started",
-        act.countsTowardScore ? "Yes" : "Exempt",
+        act.countsTowardScore ? "Yes" : "Exception",
       ]),
       styles: { fontSize: 8, cellPadding: 2.5 },
       headStyles: { fillColor: [40, 90, 60], textColor: WHITE, fontStyle: "bold", fontSize: 8 },

@@ -6,10 +6,8 @@ import {
   getScorecardTierForMda,
   mdaHasSuperMdaBonus,
   EXCEPTIONAL_SUPER_MDA_TIER_LABEL,
-  FIRST_BEEPA_COMPLETE_ABBREVIATION,
   scoreTierBandOnly,
-  FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL,
-  BEEPA_PROGRAMME_EXEMPTION_NOTES,
+  BEEPA_PROGRAMME_EXCEPTION_NOTES,
 } from "../lib/beepa-scoring";
 
 // Status thresholds and labels (based on PEBEC standards)
@@ -140,7 +138,7 @@ export const getMDAReportCard = query({
         const notStartedCount = applicableActivities.filter(
           (activity) => activity.status === "not_started"
         ).length;
-        const excludedActivities = sortedActivities.filter(
+        const exceptionActivities = sortedActivities.filter(
           (activity) =>
             !activityCountsTowardMdaScore(mda, reform.refNumber, activity.refNumber)
         );
@@ -155,7 +153,7 @@ export const getMDAReportCard = query({
           completedCount,
           inProgressCount,
           notStartedCount,
-          excludedActivityCount: excludedActivities.length,
+          exceptionActivityCount: exceptionActivities.length,
           activities: sortedActivities.map((activity) => ({
             _id: activity._id,
             refNumber: activity.refNumber,
@@ -199,9 +197,9 @@ export const getMDAReportCard = query({
       (sum, row) => sum + row.notStartedCount,
       0
     );
-    const excludedReformCount = reformRows.filter((row) => !row.countsTowardOverall).length;
-    const excludedActivityCount = reformRows.reduce(
-      (sum, row) => sum + row.excludedActivityCount,
+    const exceptionReformCount = reformRows.filter((row) => !row.countsTowardOverall).length;
+    const exceptionActivityCount = reformRows.reduce(
+      (sum, row) => sum + row.exceptionActivityCount,
       0
     );
     const weakestReforms = scoringReforms
@@ -223,12 +221,12 @@ export const getMDAReportCard = query({
       summary: {
         reformCount: reformRows.length,
         scoringReformCount: scoringReforms.length,
-        excludedReformCount,
+        exceptionReformCount,
         totalApplicableActivities,
         completedActivities,
         inProgressActivities,
         notStartedActivities,
-        excludedActivityCount,
+        exceptionActivityCount,
         completionRate:
           totalApplicableActivities === 0
             ? 0
@@ -371,7 +369,7 @@ export const getGeneralReport = query({
         applicableMdaCount: number;
         completedMdaCount: number;
         ongoingMdaCount: number;
-        exemptMdaCount: number;
+        exceptionMdaCount: number;
         applicableScoreSum: number;
       }
     >();
@@ -386,12 +384,12 @@ export const getGeneralReport = query({
             applicableMdaCount: 0,
             completedMdaCount: 0,
             ongoingMdaCount: 0,
-            exemptMdaCount: 0,
+            exceptionMdaCount: 0,
             applicableScoreSum: 0,
           };
 
         if (!reform.countsTowardOverall) {
-          entry.exemptMdaCount++;
+          entry.exceptionMdaCount++;
         } else {
           entry.applicableMdaCount++;
           entry.applicableScoreSum += reform.score;
@@ -410,7 +408,7 @@ export const getGeneralReport = query({
         applicableMdaCount: row.applicableMdaCount,
         completedMdaCount: row.completedMdaCount,
         ongoingMdaCount: row.ongoingMdaCount,
-        exemptMdaCount: row.exemptMdaCount,
+        exceptionMdaCount: row.exceptionMdaCount,
         completionRate:
           row.applicableMdaCount === 0
             ? 0
@@ -422,34 +420,21 @@ export const getGeneralReport = query({
       }))
       .sort((a, b) => a.refNumber - b.refNumber);
 
-    const firstCompleterUpper = FIRST_BEEPA_COMPLETE_ABBREVIATION.toUpperCase();
-    const isFirstBeepaCompleterAbbrev = (abbrev?: string | null) =>
-      (abbrev || "").trim().toUpperCase() === firstCompleterUpper;
-
-    /** Super MDA roster + ~100% score + not first-completion milestone (row omitted when roster empty). */
+    /** Super MDA roster at ~100% score (row omitted when roster empty). */
     const exceptionalSuperMdasFullScore = rankedMDAs.filter(
       (p) =>
-        mdaHasSuperMdaBonus({ abbreviation: p.mda.abbreviation }) &&
-        !isFirstBeepaCompleterAbbrev(p.mda.abbreviation) &&
-        p.score >= 0.995
-    );
-
-    const superMdaFirstCompletionRow = rankedMDAs.filter((p) =>
-      isFirstBeepaCompleterAbbrev(p.mda.abbreviation)
+        mdaHasSuperMdaBonus({ abbreviation: p.mda.abbreviation }) && p.score >= 0.995
     );
 
     const scoreBandLabels = ["Excellent", "Very Good", "Good", "Fair", "Poor"] as const;
 
     const mdasByPerformanceTier = [
       { label: EXCEPTIONAL_SUPER_MDA_TIER_LABEL, mdas: exceptionalSuperMdasFullScore },
-      { label: FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL, mdas: superMdaFirstCompletionRow },
       ...scoreBandLabels.map((bandLabel) => ({
         label: bandLabel,
         mdas: rankedMDAs.filter((p) => {
-          if (isFirstBeepaCompleterAbbrev(p.mda.abbreviation)) return false;
           if (
             mdaHasSuperMdaBonus({ abbreviation: p.mda.abbreviation }) &&
-            !isFirstBeepaCompleterAbbrev(p.mda.abbreviation) &&
             p.score >= 0.995
           ) {
             return false;
@@ -488,7 +473,7 @@ export const getGeneralReport = query({
       },
       mdasByPerformanceTier,
       reformAreasCompletion,
-      exemptionProgramNotes: [...BEEPA_PROGRAMME_EXEMPTION_NOTES],
+      exceptionProgramNotes: [...BEEPA_PROGRAMME_EXCEPTION_NOTES],
     };
   },
 });
@@ -529,7 +514,7 @@ export const getMDAPerformance = query({
             score: 0,
             status: getStatus(0),
             activityCount: 0,
-            exemptActivityCount: 0,
+            exceptionActivityCount: 0,
             completedCount: 0,
           };
         }
@@ -556,14 +541,14 @@ export const getMDAPerformance = query({
           status = { label: "In Progress", color: "yellow" };
         }
 
-        const exemptActivityCount = activities.length - applicableActivityCount;
+        const exceptionActivityCount = activities.length - applicableActivityCount;
 
         return {
           reform,
           score: normalizedScore,
           status,
           activityCount: applicableActivityCount,
-          exemptActivityCount,
+          exceptionActivityCount,
           completedCount,
         };
       })
