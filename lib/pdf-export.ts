@@ -4,13 +4,7 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-import {
-  EXCEPTIONAL_SUPER_MDA_TIER_LABEL,
-  FIRST_BEEPA_COMPLETE_ABBREVIATION,
-  FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL,
-  generalReportMdaNameWithAbbrev,
-  mdaHasSuperMdaBonus,
-} from "./beepa-scoring";
+import { generalReportMdaNameWithAbbrev, mdaHasSuperMdaBonus } from "./beepa-scoring";
 import { SUPER_MDA_BONUS_NARRATIVES, type SuperMdaBonusNarrative } from "./beepa-super-bonus-narratives";
 
 // ─── colours ────────────────────────────────────────────────────────────────
@@ -143,11 +137,9 @@ export function downloadGeneralReportPDF(report: {
   doc.setFontSize(8);
   doc.setTextColor(...GRAY_DARK);
   const legendLines = doc.splitTextToSize(
-    `Only NAICOM carries the Super MDA designation. « ${EXCEPTIONAL_SUPER_MDA_TIER_LABEL} » applies when NAICOM is at ~100% applicable tracker score with bonus submission evidence (excluding the milestone-only row). ` +
-      `« ${FIRST_BEEPA_COMPLETION_MILESTONE_TIER_LABEL} » recognises ${FIRST_BEEPA_COMPLETE_ABBREVIATION} as the first MDA to complete the full BEEPA exercise — not a Super MDA designation. ` +
-      "NAICOM below ~100% is grouped under Excellent / Very Good / … by score. All other MDAs use score-only bands: Excellent 100% · Very Good 80–99% · Good 60–79% · Fair 50–59% · Poor 0–49%. " +
-      "Not ranked as a league table. " +
-      `Super MDA on tracker (NAICOM): ${report.summary.bonusEligibleOnTracker}.`,
+    "Performance tier score bands (weighted average of applicable reform activities): " +
+      "Excellent ≥99.5% · Very Good 80.0%–99.4% · Good 60.0%–79.9% · Fair 50.0%–59.9% · Poor below 50%. " +
+      "Rounded percentages in the tracker match standard rounding of these values.",
     pw - 28
   );
   doc.text(legendLines, 14, y);
@@ -188,41 +180,6 @@ export function downloadGeneralReportPDF(report: {
     doc.text(stat.value, bx + 3, by + 12);
   });
   y += Math.ceil(stats.length / 3) * 20 + 8;
-
-  y = sectionHeading(doc, "MDAs by performance tier", y);
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(7);
-  doc.setTextColor(...GRAY_MID);
-  const tierIntro = doc.splitTextToSize(
-    `${FIRST_BEEPA_COMPLETE_ABBREVIATION} appears alone under its dedicated milestone tier (below); not a Super MDA designation.`,
-    pw - 28
-  );
-  doc.text(tierIntro, 14, y);
-  y += tierIntro.length * 4 + 4;
-
-  for (const tierBlock of report.mdasByPerformanceTier) {
-    if (tierBlock.mdas.length === 0) continue;
-    y = sectionHeading(doc, tierBlock.label, y + 2);
-    autoTable(doc, {
-      startY: y,
-      head: [["MDA", "Score", "Status"]],
-      body: tierBlock.mdas.map((item) => [
-        generalReportMdaNameWithAbbrev(item.mda),
-        pct(item.score),
-        item.status.label,
-      ]),
-      styles: { fontSize: 8, cellPadding: 3 },
-      headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
-      columnStyles: {
-        0: { cellWidth: 88 },
-        1: { cellWidth: 22 },
-        2: { cellWidth: 56 },
-      },
-      margin: { left: 14, right: 14 },
-    });
-    y = (doc as any).lastAutoTable.finalY + 8;
-  }
 
   const seenBonusMda = new Set<string>();
   const bonusNarrativeBlocks: Array<{ name: string; abbrev: string; narrative: SuperMdaBonusNarrative }> = [];
