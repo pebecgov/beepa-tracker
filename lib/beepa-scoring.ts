@@ -133,7 +133,7 @@ export const BEEPA_PROGRAMME_EXCEPTION_NOTES: readonly string[] = [
   "Trade Marks Registry was granted an exception from participation in the BEEPA exercise due to ongoing challenges with its online registration platform and internal operational issues affecting processes and service delivery; as a result it could not participate effectively during the assessment period.",
   "Bank of Agriculture (BOA) was granted an exception to participate in a subsequent BEEPA implementation cycle, having not been included at the commencement of the current programme timeline.",
   "Nigerian Agricultural Insurance Corporation (NAIC) was granted an exception to participate in a subsequent BEEPA implementation cycle following the fire incident which significantly impacted its ICT infrastructure and operational capacity.",
-  "Nigeria Revenue Service (NRS) was granted an exception in light of the ongoing tax reform processes currently being undertaken by the Service.",
+  "Nigeria Revenue Service (NRS) was granted an exception in light of the ongoing transition from FRS to NRS and the ongoing restructuring of the internal structure of NRS .",
 ];
 
 /** Super MDA bonus roster (empty = no Super MDA tier active). Re-add abbreviations here when re-enabled. */
