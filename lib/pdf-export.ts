@@ -88,6 +88,36 @@ function exceptionSectionHeading(doc: jsPDF, text: string, y: number) {
   return y + 11;
 }
 
+const PDF_MARGIN_X = 14;
+
+/** Draw wrapped text line-by-line; returns the Y position after the last line. */
+function drawWrappedText(
+  doc: jsPDF,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  options: {
+    fontSize?: number;
+    fontStyle?: "normal" | "bold" | "italic";
+    lineHeightMm?: number;
+    color?: [number, number, number];
+  } = {}
+): number {
+  const fontSize = options.fontSize ?? 8;
+  const lineHeightMm = options.lineHeightMm ?? 4.5;
+  doc.setFont("helvetica", options.fontStyle ?? "normal");
+  doc.setFontSize(fontSize);
+  if (options.color) doc.setTextColor(...options.color);
+  const lines = doc.splitTextToSize(text, maxWidth);
+  let cy = y;
+  for (const line of lines) {
+    doc.text(line, x, cy, { maxWidth });
+    cy += lineHeightMm;
+  }
+  return cy;
+}
+
 function programmeNotePanels(
   doc: jsPDF,
   y: number,
@@ -96,22 +126,46 @@ function programmeNotePanels(
   panelColor: [number, number, number],
   accentColor: [number, number, number]
 ) {
+  const marginL = PDF_MARGIN_X;
+  const marginR = PDF_MARGIN_X;
   const accentW = 2.8;
-  const panelInnerW = pw - 28 - accentW - 10;
+  const padX = 4;
+  const padY = 5;
+  const lineHeightMm = 4.5;
+  const panelW = pw - marginL - marginR;
+  const textX = marginL + accentW + padX;
+  const textMaxW = panelW - accentW - padX;
+  const pageH = doc.internal.pageSize.getHeight();
+  const bottomMargin = 16;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+
   for (const note of notes) {
-    const lines = doc.splitTextToSize(note, panelInnerW);
-    const rowH = lines.length * 4 + 8;
+    const lines = doc.splitTextToSize(note, textMaxW);
+    const rowH = lines.length * lineHeightMm + padY * 2;
+
+    if (y + rowH > pageH - bottomMargin) {
+      doc.addPage();
+      y = marginL;
+    }
+
     doc.setFillColor(...panelColor);
-    doc.roundedRect(14, y, pw - 28, rowH, 1.5, 1.5, "F");
+    doc.roundedRect(marginL, y, panelW, rowH, 1.5, 1.5, "F");
     doc.setFillColor(...accentColor);
-    doc.rect(14, y, accentW, rowH, "F");
+    doc.rect(marginL, y, accentW, rowH, "F");
+
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(...GRAY_DARK);
-    doc.text(lines, 14 + accentW + 5, y + 5);
-    y += rowH + 3;
+    let textY = y + padY;
+    for (const line of lines) {
+      doc.text(line, textX, textY, { maxWidth: textMaxW });
+      textY += lineHeightMm;
+    }
+    y += rowH + 4;
   }
-  return y + 4;
+  return y + 2;
 }
 
 // ─── General Report PDF ───────────────────────────────────────────────────────
@@ -238,12 +292,14 @@ export function downloadGeneralReportPDF(report: {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(...GRAY_MID);
-    const intro = doc.splitTextToSize(
+    y = drawWrappedText(
+      doc,
       "Validated bonus-point submission on record for NAICOM (sole Super MDA on the programme roster).",
-      pw - 28
-    );
-    doc.text(intro, 14, y);
-    y += intro.length * 4 + 4;
+      PDF_MARGIN_X,
+      y,
+      pw - PDF_MARGIN_X * 2,
+      { fontSize: 8, color: GRAY_MID, lineHeightMm: 4 }
+    ) + 4;
 
     for (const block of bonusNarrativeBlocks) {
       doc.setFont("helvetica", "bold");
@@ -255,9 +311,13 @@ export function downloadGeneralReportPDF(report: {
         doc.setFont("helvetica", "bold");
         doc.setFontSize(8);
         doc.setTextColor(...PEBEC_GREEN);
-        const titleLines = doc.splitTextToSize(block.narrative.title, pw - 28);
-        doc.text(titleLines, 14, y);
-        y += titleLines.length * 4 + 2;
+        y =
+          drawWrappedText(doc, block.narrative.title, PDF_MARGIN_X, y, pw - PDF_MARGIN_X * 2, {
+            fontSize: 8,
+            fontStyle: "bold",
+            color: PEBEC_GREEN,
+            lineHeightMm: 4,
+          }) + 2;
       }
       if (block.narrative.submissionRows && block.narrative.submissionRows.length > 0) {
         autoTable(doc, {
@@ -280,9 +340,12 @@ export function downloadGeneralReportPDF(report: {
         doc.setFontSize(8);
         doc.setTextColor(...GRAY_DARK);
         const bulletText = block.narrative.bullets.map((b) => `• ${b}`).join("\n");
-        const blines = doc.splitTextToSize(bulletText, pw - 28);
-        doc.text(blines, 14, y);
-        y += blines.length * 4 + 6;
+        y =
+          drawWrappedText(doc, bulletText, PDF_MARGIN_X, y, pw - PDF_MARGIN_X * 2, {
+            fontSize: 8,
+            color: GRAY_DARK,
+            lineHeightMm: 4,
+          }) + 6;
       }
     }
   }
@@ -340,15 +403,6 @@ export function downloadGeneralReportPDF(report: {
   if (exceptionProgramNotes.length > 0) {
     y += 2;
     y = exceptionSectionHeading(doc, "Programme exceptions", y);
-    doc.setFont("helvetica", "italic");
-    doc.setFontSize(7);
-    doc.setTextColor(...GRAY_MID);
-    const exceptionIntro = doc.splitTextToSize(
-      "Formal programme exceptions affecting tracker scoring and reform applicability.",
-      pw - 28
-    );
-    doc.text(exceptionIntro, 14, y);
-    y += exceptionIntro.length * 4 + 5;
 
     y = programmeNotePanels(
       doc,
