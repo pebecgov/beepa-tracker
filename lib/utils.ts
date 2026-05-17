@@ -1,5 +1,5 @@
 import { getMdaApplicableStatus } from "./beepa-scoring";
-import { Status } from "./types";
+import { Status, StatusColor } from "./types";
 
 /**
  * Get MDA status from a normalized score (0-1), aligned with performance tier bands.
