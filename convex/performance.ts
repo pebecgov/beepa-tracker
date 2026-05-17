@@ -7,12 +7,14 @@ import {
   mdaHasSuperMdaBonus,
   EXCEPTIONAL_SUPER_MDA_TIER_LABEL,
   scoreTierBandOnly,
+  getMdaApplicableStatus,
+  isPoorTierScore,
   BEEPA_PROGRAMME_EXCEPTION_NOTES,
+  mdaHasProgrammeException,
 } from "../lib/beepa-scoring";
 
-// Status thresholds and labels (based on PEBEC standards)
-// Requires Intervention: 0-30%, Progressing With Difficulty: 31-49%, Progressing: 50-70%, Progressing Well: 71-89%, Successful: 90-100%
-const STATUS_THRESHOLDS = [
+// Reform-level status (activity-weighted); MDA rollup uses `getMdaApplicableStatus`.
+const REFORM_STATUS_THRESHOLDS = [
   { max: 0.30, label: "Requires Intervention", color: "red" },
   { max: 0.49, label: "Progressing With Difficulty", color: "orange" },
   { max: 0.70, label: "In Progress", color: "yellow" },
@@ -20,14 +22,29 @@ const STATUS_THRESHOLDS = [
   { max: 1.01, label: "Successful", color: "green" },
 ] as const;
 
-// Get status from score
-function getStatus(score: number): { label: string; color: string } {
-  for (const threshold of STATUS_THRESHOLDS) {
+function getReformStatus(score: number): { label: string; color: string } {
+  for (const threshold of REFORM_STATUS_THRESHOLDS) {
     if (score <= threshold.max) {
       return { label: threshold.label, color: threshold.color };
     }
   }
-  return STATUS_THRESHOLDS[STATUS_THRESHOLDS.length - 1];
+  return REFORM_STATUS_THRESHOLDS[REFORM_STATUS_THRESHOLDS.length - 1];
+}
+
+function getMdaStatus(score: number): { label: string; color: string } {
+  return getMdaApplicableStatus(score);
+}
+
+function applyMdaStatusProgressOverride(
+  mdaScore: number,
+  status: { label: string; color: string },
+  hasInProgressReform: boolean
+): { label: string; color: string } {
+  if (isPoorTierScore(mdaScore)) return status;
+  if (status.label === "Requires Intervention" && hasInProgressReform) {
+    return { label: "In Progress", color: "yellow" };
+  }
+  return status;
 }
 
 // Get reform performance (weighted score from activities)
@@ -46,7 +63,7 @@ export const getReformPerformance = query({
       return {
         reform,
         score: 0,
-        status: getStatus(0),
+        status: getReformStatus(0),
         activityCount: 0,
         completedCount: 0,
         activities: [],
@@ -64,7 +81,7 @@ export const getReformPerformance = query({
       }
     }
 
-    let status = getStatus(weightedScore);
+    let status = getReformStatus(weightedScore);
     if (status.label === "Requires Intervention" && completedCount > 0) {
       status = { label: "In Progress", color: "yellow" };
     }
@@ -146,7 +163,7 @@ export const getMDAReportCard = query({
         return {
           reform,
           score,
-          status: getStatus(score),
+          status: getReformStatus(score),
           countsTowardOverall,
           activityCount: sortedActivities.length,
           applicableActivityCount: applicableActivities.length,
@@ -215,7 +232,7 @@ export const getMDAReportCard = query({
     return {
       mda,
       score,
-      status: getStatus(score),
+      status: getMdaStatus(score),
       tier: getScorecardTierForMda(mda, score),
       generatedAt: Date.now(),
       summary: {
@@ -341,7 +358,7 @@ export const getGeneralReport = query({
           abbreviation: mda.abbreviation ?? null,
         },
         score,
-        status: getStatus(score),
+        status: getMdaStatus(score),
         tier: getScorecardTierForMda(mda, score),
         reformCount: mdaReforms.length,
         scoringReformCount: scoringReforms.length,
@@ -432,6 +449,9 @@ export const getGeneralReport = query({
       ...scoreBandLabels.map((bandLabel) => ({
         label: bandLabel,
         mdas: rankedMDAs.filter((p) => {
+          if (mdaHasProgrammeException({ abbreviation: p.mda.abbreviation })) {
+            return false;
+          }
           if (mdaHasSuperMdaBonus({ abbreviation: p.mda.abbreviation })) {
             return false;
           }
@@ -457,7 +477,7 @@ export const getGeneralReport = query({
         totalReforms: reforms.length,
         totalActivities: activities.length,
         overallScore,
-        overallStatus: getStatus(overallScore),
+        overallStatus: getMdaStatus(overallScore),
         highestScoreMda: rankedMDAs[0] ?? null,
         exceptionalPerformanceCount: exceptionalSuperMdas.length,
         bonusEligibleOnTracker,
@@ -487,7 +507,7 @@ export const getMDAPerformance = query({
       return {
         mda,
         score: 0,
-        status: getStatus(0),
+        status: getMdaStatus(0),
         reformCount: 0,
         reforms: [],
       };
@@ -505,7 +525,7 @@ export const getMDAPerformance = query({
           return {
             reform,
             score: 0,
-            status: getStatus(0),
+            status: getReformStatus(0),
             activityCount: 0,
             exceptionActivityCount: 0,
             completedCount: 0,
@@ -529,7 +549,7 @@ export const getMDAPerformance = query({
         }
 
         const normalizedScore = totalApplicableWeight > 0 ? weightedScore / totalApplicableWeight : 0;
-        let status = getStatus(normalizedScore);
+        let status = getReformStatus(normalizedScore);
         if (status.label === "Requires Intervention" && completedCount > 0) {
           status = { label: "In Progress", color: "yellow" };
         }
@@ -560,13 +580,14 @@ export const getMDAPerformance = query({
         ? 0
         : scoringReforms.reduce((sum, r) => sum + r.score, 0) / scoringReforms.length;
 
-    let status = getStatus(mdaScore);
     const hasInProgressReform = scoringReforms.some(
       (r) => r.status.label !== "Requires Intervention"
     );
-    if (status.label === "Requires Intervention" && hasInProgressReform) {
-      status = { label: "In Progress", color: "yellow" };
-    }
+    const status = applyMdaStatusProgressOverride(
+      mdaScore,
+      getMdaStatus(mdaScore),
+      hasInProgressReform
+    );
 
     return {
       mda,
@@ -596,7 +617,7 @@ export const getOverallPerformance = query({
           return {
             mda,
             score: 0,
-            status: getStatus(0),
+            status: getMdaStatus(0),
             reformCount: 0,
           };
         }
@@ -609,7 +630,7 @@ export const getOverallPerformance = query({
           return {
             mda,
             score: 0,
-            status: getStatus(0),
+            status: getMdaStatus(0),
             reformCount: reforms.length,
           };
         }
@@ -622,7 +643,7 @@ export const getOverallPerformance = query({
               .withIndex("by_reform", (q) => q.eq("reformId", reform._id))
               .collect();
 
-            if (activities.length === 0) return { score: 0, status: getStatus(0) };
+            if (activities.length === 0) return { score: 0, status: getReformStatus(0) };
 
             let weightedScore = 0;
             let totalApplicableWeight = 0;
@@ -635,7 +656,7 @@ export const getOverallPerformance = query({
             }
 
             const normalizedScore = totalApplicableWeight > 0 ? weightedScore / totalApplicableWeight : 0;
-            let status = getStatus(normalizedScore);
+            let status = getReformStatus(normalizedScore);
             if (status.label === "Requires Intervention" && completedCount > 0) {
               status = { label: "In Progress", color: "yellow" };
             }
@@ -645,13 +666,14 @@ export const getOverallPerformance = query({
         );
 
         const mdaScore = reformPerformances.reduce((sum, p) => sum + p.score, 0) / reformPerformances.length;
-        let status = getStatus(mdaScore);
         const hasInProgressReform = reformPerformances.some(
           (p) => p.status.label !== "Requires Intervention"
         );
-        if (status.label === "Requires Intervention" && hasInProgressReform) {
-          status = { label: "In Progress", color: "yellow" };
-        }
+        const status = applyMdaStatusProgressOverride(
+          mdaScore,
+          getMdaStatus(mdaScore),
+          hasInProgressReform
+        );
 
         return {
           mda,
@@ -683,7 +705,7 @@ export const getRankedMDAs = query({
           return {
             mda,
             score: 0,
-            status: getStatus(0),
+            status: getMdaStatus(0),
             reformCount: 0,
             activityCount: 0,
             rank: 0,
@@ -699,7 +721,7 @@ export const getRankedMDAs = query({
           return {
             mda,
             score: 0,
-            status: getStatus(0),
+            status: getMdaStatus(0),
             reformCount: reforms.length,
             activityCount: 0,
             rank: 0,
@@ -716,7 +738,7 @@ export const getRankedMDAs = query({
               .collect();
 
             totalActivities += activities.length;
-            if (activities.length === 0) return { score: 0, status: getStatus(0) };
+            if (activities.length === 0) return { score: 0, status: getReformStatus(0) };
 
             let weightedScore = 0;
             let totalApplicableWeight = 0;
@@ -732,7 +754,7 @@ export const getRankedMDAs = query({
             }
 
             const normalizedScore = totalApplicableWeight > 0 ? weightedScore / totalApplicableWeight : 0;
-            let status = getStatus(normalizedScore);
+            let status = getReformStatus(normalizedScore);
             if (status.label === "Requires Intervention" && completedCount > 0) {
               status = { label: "In Progress", color: "yellow" };
             }
@@ -744,13 +766,14 @@ export const getRankedMDAs = query({
         const mdaScore =
           reformPerformances.reduce((sum, p) => sum + p.score, 0) /
           reformPerformances.length;
-        let status = getStatus(mdaScore);
         const hasInProgressReform = reformPerformances.some(
           (p) => p.status.label !== "Requires Intervention"
         );
-        if (status.label === "Requires Intervention" && hasInProgressReform) {
-          status = { label: "In Progress", color: "yellow" };
-        }
+        const status = applyMdaStatusProgressOverride(
+          mdaScore,
+          getMdaStatus(mdaScore),
+          hasInProgressReform
+        );
 
         return {
           mda,
@@ -1056,6 +1079,8 @@ export const getDashboardStats = query({
 
     // Calculate each MDA's score and categorize
     for (const mda of mdas) {
+      if (mdaHasProgrammeException(mda)) continue;
+
       const mdaReforms = reforms.filter((r) => r.mdaId === mda._id);
       if (mdaReforms.length === 0) {
         statusCounts.requiresIntervention++;
@@ -1083,7 +1108,7 @@ export const getDashboardStats = query({
           if (act.status === "complete") completedCount++;
         }
         const normalizedScore = totalApplicableWeight > 0 ? reformScore / totalApplicableWeight : 0;
-        let status = getStatus(normalizedScore);
+        let status = getReformStatus(normalizedScore);
         if (status.label === "Requires Intervention" && completedCount > 0) {
           status = { label: "In Progress", color: "yellow" };
         }
@@ -1091,12 +1116,12 @@ export const getDashboardStats = query({
       });
 
       const mdaScore = reformStatuses.reduce((sum, s) => sum + s.score, 0) / mdaReformsForScore.length;
-      let status = getStatus(mdaScore);
       const hasInProgressReform = reformStatuses.some((s) => s.status.label !== "Requires Intervention");
-
-      if (status.label === "Requires Intervention" && hasInProgressReform) {
-        status = { label: "In Progress", color: "yellow" };
-      }
+      const status = applyMdaStatusProgressOverride(
+        mdaScore,
+        getMdaStatus(mdaScore),
+        hasInProgressReform
+      );
 
       if (status.label === "Requires Intervention") statusCounts.requiresIntervention++;
       else if (status.label === "Progressing With Difficulty")
@@ -1112,7 +1137,7 @@ export const getDashboardStats = query({
       totalActivities: activities.length,
       activityStats,
       averageScore,
-      overallStatus: getStatus(averageScore),
+      overallStatus: getMdaStatus(averageScore),
       statusCounts,
     };
   },

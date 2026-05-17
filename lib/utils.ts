@@ -1,25 +1,12 @@
-import { Status, StatusLabel, StatusColor } from "./types";
-
-// Status thresholds configuration (matching Excel formula)
-// =IF(score<=0.25,"Requires Intervention",IF(score<0.5,"Progressing With Difficulty",IF(score<0.75,"Progressing",IF(score<0.95,"Progressing Well",IF(score>=0.95,"Successful","")))))
-const STATUS_THRESHOLDS: Array<{ max: number; label: StatusLabel; color: StatusColor }> = [
-  { max: 0.25, label: "Requires Intervention", color: "red" },
-  { max: 0.4999, label: "Progressing With Difficulty", color: "orange" },
-  { max: 0.7499, label: "In Progress", color: "yellow" },
-  { max: 0.9499, label: "Progressing Well", color: "blue" },
-  { max: 1.01, label: "Successful", color: "green" },
-];
+import { getMdaApplicableStatus } from "./beepa-scoring";
+import { Status } from "./types";
 
 /**
- * Get status from a normalized score (0-1)
+ * Get MDA status from a normalized score (0-1), aligned with performance tier bands.
+ * Poor tier (0–49%) → Requires Intervention (red).
  */
 export function getStatus(score: number): Status {
-  for (const threshold of STATUS_THRESHOLDS) {
-    if (score <= threshold.max) {
-      return { label: threshold.label, color: threshold.color };
-    }
-  }
-  return STATUS_THRESHOLDS[STATUS_THRESHOLDS.length - 1];
+  return getMdaApplicableStatus(score) as Status;
 }
 
 /**

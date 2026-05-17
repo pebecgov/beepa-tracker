@@ -21,7 +21,10 @@ const PEBEC_MDAS = [
   { name: "Bureau for Public Procurement", abbreviation: "BPP" },
   { name: "National Bureau of Statistics", abbreviation: "NBS" },
 
-  { name: "Ministry of Interior - Citizenship and Business Development Department", abbreviation: "CBDD" },
+  {
+    name: "Citizenship and Business Department (CBD) within the Ministry of Interior",
+    abbreviation: "CBD",
+  },
   { name: "Corporate Affairs Commission", abbreviation: "CAC" },
   { name: "EFCC – Special Control Unit for Money Laundering", abbreviation: "SCUML" },
   { name: "Industrial Training Fund", abbreviation: "ITF" },
@@ -380,6 +383,16 @@ export const syncFramework = mutation({
         mda =
           mdaByAbbreviation.get("CBN-NCR") ||
           mdaByName.get("Central Bank of Nigeria – National Collateral Registry");
+      }
+      if (!mda && mdaInfo.abbreviation === "CBD") {
+        mda =
+          mdaByAbbreviation.get("CBDD") ||
+          mdaByName.get(
+            "Ministry of Interior - Citizenship and Business Development Department"
+          ) ||
+          mdaByName.get(
+            "Citizenship and Business Development Department (CBDD) within the Ministry of Interior"
+          );
       }
       if (!mda) {
         const mdaId = await ctx.db.insert("mdas", {

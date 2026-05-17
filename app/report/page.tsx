@@ -219,52 +219,91 @@ export default function GeneralReportPage() {
             <p className="text-sm text-gray-500 mt-1">Bands reflect applicable weighted reform completion only.</p>
           </div>
           <div className="divide-y divide-gray-100">
-            {mdasByPerformanceTier.map((tierBlock) =>
-              tierBlock.mdas.length === 0 ? null : (
-                <div key={tierBlock.label} className="px-6 py-6">
+            {mdasByPerformanceTier.map((tierBlock) => {
+              if (tierBlock.mdas.length === 0) return null;
+              const isPoorTier = tierBlock.label === "Poor";
+              return (
+                <div key={tierBlock.label} className={`px-6 py-6 ${isPoorTier ? "bg-red-50/40" : ""}`}>
                   <div className="flex flex-wrap items-center gap-3 mb-4">
                     <TierBadge label={tierBlock.label} />
-                    <span className="text-sm text-gray-500">
+                    <span className={`text-sm ${isPoorTier ? "text-red-800/90" : "text-gray-500"}`}>
                       {tierBlock.mdas.length} {tierBlock.mdas.length === 1 ? "MDA" : "MDAs"}
+                      {isPoorTier ? " · Requires intervention" : ""}
                     </span>
                   </div>
-                  <div className="overflow-x-auto rounded-lg border border-gray-100">
+                  <div
+                    className={`overflow-x-auto rounded-lg border ${
+                      isPoorTier ? "border-red-200" : "border-gray-100"
+                    }`}
+                  >
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead className="bg-gray-50">
+                      <thead className={isPoorTier ? "bg-red-100" : "bg-gray-50"}>
                         <tr>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-900">MDA</th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-900">Score</th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-900">Status</th>
+                          <th
+                            className={`px-4 py-3 text-left font-semibold ${
+                              isPoorTier ? "text-red-950" : "text-gray-900"
+                            }`}
+                          >
+                            MDA
+                          </th>
+                          <th
+                            className={`px-4 py-3 text-left font-semibold ${
+                              isPoorTier ? "text-red-950" : "text-gray-900"
+                            }`}
+                          >
+                            Score
+                          </th>
+                          <th
+                            className={`px-4 py-3 text-left font-semibold ${
+                              isPoorTier ? "text-red-950" : "text-gray-900"
+                            }`}
+                          >
+                            Status
+                          </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-100 bg-white">
+                      <tbody
+                        className={`divide-y ${
+                          isPoorTier ? "divide-red-100 bg-red-50/30" : "divide-gray-100 bg-white"
+                        }`}
+                      >
                         {tierBlock.mdas.map((item) => (
                           <tr key={item.mda._id}>
-                            <td className="px-4 py-3 font-medium text-gray-900 max-w-md">
+                            <td
+                              className={`px-4 py-3 font-medium max-w-md ${
+                                isPoorTier ? "text-red-950" : "text-gray-900"
+                              }`}
+                            >
                               {generalReportMdaNameWithAbbrev(item.mda)}
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex flex-col gap-1 max-w-[200px]">
                                 <ProgressBar
                                   score={item.score}
-                                  color={(item.status as Status).color}
+                                  color={isPoorTier ? "red" : (item.status as Status).color}
                                   showLabel={false}
                                   size="sm"
                                 />
-                                <span className="text-xs font-semibold text-gray-900">
+                                <span
+                                  className={`text-xs font-semibold ${
+                                    isPoorTier ? "text-red-800" : "text-gray-900"
+                                  }`}
+                                >
                                   {formatScore(item.score)}
                                 </span>
                               </div>
                             </td>
-                            <td className="px-4 py-3 text-gray-700">{item.status.label}</td>
+                            <td className="px-4 py-3">
+                              <StatusBadge status={item.status as Status} />
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
                 </div>
-              )
-            )}
+              );
+            })}
           </div>
         </section>
 
@@ -272,8 +311,8 @@ export default function GeneralReportPage() {
           <section className="bg-white rounded-xl border border-gray-200 p-6">
             <h2 className="text-lg font-semibold text-gray-900">Super MDA — regulatory simplification submissions</h2>
             <p className="text-sm text-gray-500 mt-1">
-              NPA and NCS validated bonus-point claims under the BEEPA Weighted Reform Framework (regulatory
-              simplification cluster).
+              NPA, NCS, PENCOM, and NITDA validated bonus-point claims under the BEEPA Weighted Reform Framework
+              (regulatory simplification cluster).
             </p>
             <div className="mt-6 space-y-4">
               {bonusNarrativeBlocks.map((block) => (
@@ -348,7 +387,10 @@ export default function GeneralReportPage() {
                   className="flex gap-0 overflow-hidden rounded-lg border border-violet-200 bg-white shadow-sm"
                 >
                   <div className="w-1.5 shrink-0 bg-linear-to-b from-violet-600 to-indigo-600" aria-hidden />
-                  <p className="flex-1 py-3.5 pr-4 pl-4 text-sm leading-relaxed text-gray-800">{note}</p>
+                  <div className="flex-1 py-3.5 pr-4 pl-4">
+                    <p className="text-sm font-semibold text-violet-950">{note.heading}</p>
+                    <p className="mt-2 text-sm leading-relaxed text-gray-800">{note.narrative}</p>
+                  </div>
                 </div>
               ))}
             </div>

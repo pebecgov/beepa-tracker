@@ -27,19 +27,19 @@ export function StatusDistribution({ stats }: StatusDistributionProps) {
       label: "Progressing",
       count: statusCounts.progressing,
       color: "yellow" as const,
-      range: "50% - 70%",
+      range: "60% - 79%",
     },
     {
       label: "Progressing With Difficulty",
       count: statusCounts.progressingWithDifficulty,
       color: "orange" as const,
-      range: "31% - 49%",
+      range: "50% - 59%",
     },
     {
       label: "Requires Intervention",
       count: statusCounts.requiresIntervention,
       color: "red" as const,
-      range: "0% - 30%",
+      range: "0% - 49%",
     },
   ];
 

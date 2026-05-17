@@ -127,17 +127,62 @@ export function activityCountsTowardMdaScore(
 export const NRS_REFORM_THREE_EXCEPTION_NOTE =
   "NRS exception from Reform 3 scoring: statutory timeline extension under national tax reform implementation.";
 
+/** MDAs on programme exception roster (excluded from tier bands and requires-intervention listings). */
+export const BEEPA_PROGRAMME_EXCEPTION_MDA_ABBREVIATIONS = [
+  "BOA",
+  "NAIC",
+  "NRS",
+  "CBN",
+] as const;
+
+export function mdaHasProgrammeException(mda: { abbreviation?: string | null }): boolean {
+  const a = mda.abbreviation?.trim().toUpperCase();
+  if (!a) return false;
+  if (a === "CBN-NCR") return true;
+  return (BEEPA_PROGRAMME_EXCEPTION_MDA_ABBREVIATIONS as readonly string[]).includes(a);
+}
+
+export type ProgrammeExceptionNote = {
+  heading: string;
+  narrative: string;
+};
+
 /** Programme exception narratives — general report « Programme exceptions » panel / PDF. */
-export const BEEPA_PROGRAMME_EXCEPTION_NOTES: readonly string[] = [
-  "Patents & Designs Registry (PDR) was granted an exception from participation in the BEEPA exercise due to ongoing challenges with its online registration platform and internal operational issues affecting processes and service delivery; as a result it could not participate effectively during the assessment period.",
-  "Trade Marks Registry was granted an exception from participation in the BEEPA exercise due to ongoing challenges with its online registration platform and internal operational issues affecting processes and service delivery; as a result it could not participate effectively during the assessment period.",
-  "Bank of Agriculture (BOA) was granted an exception to participate in a subsequent BEEPA implementation cycle, having not been included at the commencement of the current programme timeline.",
-  "Nigerian Agricultural Insurance Corporation (NAIC) was granted an exception to participate in a subsequent BEEPA implementation cycle following the fire incident which significantly impacted its ICT infrastructure and operational capacity.",
-  "Nigeria Revenue Service (NRS) was granted an exception in light of the ongoing transition from FRS to NRS and the ongoing restructuring of the internal structure of NRS .",
+export const BEEPA_PROGRAMME_EXCEPTION_NOTES: readonly ProgrammeExceptionNote[] = [
+  {
+    heading: "Patents & Designs Registry (PDR)",
+    narrative:
+      "The Patents & Designs Registry (PDR) was granted a temporary exemption from the current BEEPA assessment cycle due to ongoing challenges with its online registration platform and internal operational issues affecting its processes and service delivery. As a result, it was unable to participate effectively during the assessment period.",
+  },
+  {
+    heading: "Trade Marks Registry",
+    narrative:
+      "The Trade Marks Registry was granted a temporary exemption from the current BEEPA assessment cycle due to ongoing challenges with its online registration platform and internal operational issues affecting its processes and service delivery. As a result, it was unable to participate effectively during the assessment period.",
+  },
+  {
+    heading: "Bank of Agriculture (BOA)",
+    narrative:
+      "The Bank of Agriculture (BOA) was granted a temporary exemption and will participate in a subsequent BEEPA implementation cycle, having not been included at the commencement of the current programme cycle.",
+  },
+  {
+    heading: "Nigerian Agricultural Insurance Corporation (NAIC)",
+    narrative:
+      "The Nigerian Agricultural Insurance Corporation (NAIC) was granted a temporary exemption from the current BEEPA assessment cycle following a fire incident that significantly impacted its ICT infrastructure and operational capacity.",
+  },
+  {
+    heading: "Nigeria Revenue Service (NRS)",
+    narrative:
+      "The Nigeria Revenue Service (NRS) was granted a temporary exemption in light of the ongoing transition from the Federal Inland Revenue Service (FIRS) to the NRS, the restructuring of its internal systems, and the operational demands associated with implementing the new tax law.",
+  },
+  {
+    heading: "Central Bank of Nigeria (CBN)",
+    narrative:
+      "The Central Bank of Nigeria (CBN) was granted a programme exemption. The National Collateral Registry, which was previously tracked separately, is a unit within a department of the CBN; therefore, BEEPA assessment and reporting now cover the institution as a whole.",
+  },
 ];
 
 /** Super MDA bonus roster — validated regulatory-simplification submissions (bonus points). */
-export const SUPER_MDA_BONUS_ABBREVIATIONS = ["NPA", "NCS"] as const;
+export const SUPER_MDA_BONUS_ABBREVIATIONS = ["NPA", "NCS", "PENCOM", "NITDA"] as const;
 
 export type ScorecardTier = {
   label: string;
@@ -147,7 +192,7 @@ export type ScorecardTier = {
 
 /** Label for the exceptional Super MDA tier row (unused while `SUPER_MDA_BONUS_ABBREVIATIONS` is empty). */
 export const EXCEPTIONAL_SUPER_MDA_TIER_LABEL =
-  "Exceptional performance (Super MDA) — Submission of evidence for bonus point";
+  "Exceptional performance (Super MDAs) — Submission of evidence for bonus point";
 
 export function mdaHasSuperMdaBonus(mda: { abbreviation?: string | null }): boolean {
   const a = mda.abbreviation?.trim();
@@ -159,6 +204,24 @@ export function mdaHasSuperMdaBonus(mda: { abbreviation?: string | null }): bool
 /** Rounded score percent (0–100), aligned with displayed scores in the UI and reports. */
 export function beepaScorePercentRounded(score: number): number {
   return Math.round(score * 100);
+}
+
+/** MDA status aligned with score tier bands (Poor → Requires Intervention, red). */
+export function getMdaApplicableStatus(score: number): { label: string; color: string } {
+  const tierLabel = scoreTierBandOnly(score).label;
+  if (tierLabel === "Poor") {
+    return { label: "Requires Intervention", color: "red" };
+  }
+  const pct = beepaScorePercentRounded(score);
+  if (pct >= 100) return { label: "Successful", color: "green" };
+  if (pct >= 80) return { label: "Progressing Well", color: "blue" };
+  if (pct >= 60) return { label: "In Progress", color: "yellow" };
+  if (pct >= 50) return { label: "Progressing With Difficulty", color: "orange" };
+  return { label: "Requires Intervention", color: "red" };
+}
+
+export function isPoorTierScore(score: number): boolean {
+  return scoreTierBandOnly(score).label === "Poor";
 }
 
 export function scoreTierBandOnly(score: number): ScorecardTier {
@@ -215,7 +278,11 @@ export function getScorecardTierForMda(
       ? "Regulatory simplification for shipping company/agent licensing (certificate issuance); turnaround reduced from ~6 weeks to 10 working days, with March 2026 service-delivery evidence on record."
       : abbrev === "NCS"
         ? "Twelve qualifying regulatory simplification measures (digital trade, OSS, NII, STR, AfCFTA CoO, licensing) meeting BEEPA RS(A)–RS(C); ten live on public portals per Annex A submission."
-        : "Validated regulatory simplification bonus submission on record.";
+        : abbrev === "PENCOM"
+          ? "Data recapture document reduction and pay-out approval ceding to Licensed PFAs (PenCom/TECH/NDM/2026/48; PenCom/INSP/Surv/Aut/451) meeting BEEPA RS(A)–RS(C)."
+          : abbrev === "NITDA"
+            ? "IT Project Clearance and IICP registration simplifications published in Service Charter 6th Edition 2026 and IT Project Clearance Guideline (PEBEC submission, 5 May 2026) meeting BEEPA RS(A)–RS(C)."
+            : "Validated regulatory simplification bonus submission on record.";
   const scoreNote =
     score >= 0.995
       ? " Applicable BEEPA reform score at full implementation."
@@ -245,5 +312,7 @@ export function tierLabelWithPercentRange(label: string): string {
 /** General report tier tables: full name with abbreviation when present. */
 export function generalReportMdaNameWithAbbrev(mda: { name: string; abbreviation?: string | null }) {
   const a = mda.abbreviation?.trim();
-  return a ? `${mda.name} (${a})` : mda.name;
+  if (!a) return mda.name;
+  if (mda.name.includes(`(${a})`)) return mda.name;
+  return `${mda.name} (${a})`;
 }

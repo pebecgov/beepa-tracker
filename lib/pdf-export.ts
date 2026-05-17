@@ -4,7 +4,11 @@
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
-import { generalReportMdaNameWithAbbrev, tierLabelWithPercentRange } from "./beepa-scoring";
+import {
+  generalReportMdaNameWithAbbrev,
+  tierLabelWithPercentRange,
+  type ProgrammeExceptionNote,
+} from "./beepa-scoring";
 import { collectSuperMdaBonusNarrativeBlocks } from "./beepa-super-bonus-narratives";
 
 // ─── colours ────────────────────────────────────────────────────────────────
@@ -22,6 +26,9 @@ const EXCEPTION_CELL_BG: [number, number, number] = [237, 233, 254];
 const EXCEPTION_VIOLET: [number, number, number] = [91, 33, 182];
 const EXCEPTION_VIOLET_PANEL: [number, number, number] = [245, 243, 255];
 const EXCEPTION_VIOLET_ACCENT: [number, number, number] = [124, 58, 237];
+/** Requires intervention section and table */
+const INTERVENTION_RED: [number, number, number] = [185, 28, 28];
+const INTERVENTION_RED_LIGHT: [number, number, number] = [254, 242, 242];
 
 function pct(v: number) {
   return `${Math.round(v * 100)}%`;
@@ -63,30 +70,91 @@ function addPageHeader(doc: jsPDF, title: string, subtitle: string, dateStr: str
 }
 
 function sectionHeading(doc: jsPDF, text: string, y: number) {
-  const pw = doc.internal.pageSize.getWidth();
-  doc.setFillColor(...PEBEC_GREEN);
-  doc.rect(14, y, pw - 28, 7, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(...WHITE);
-  doc.text(text.toUpperCase(), 17, y + 5);
-  return y + 11;
+  return bandSectionHeading(doc, text, y, PEBEC_GREEN);
 }
 
 function exceptionSectionHeading(doc: jsPDF, text: string, y: number) {
-  const pw = doc.internal.pageSize.getWidth();
-  doc.setFillColor(...EXCEPTION_VIOLET);
-  doc.rect(14, y, pw - 28, 7, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(...WHITE);
-  doc.text(text.toUpperCase(), 17, y + 5);
-  return y + 11;
+  return bandSectionHeading(doc, text, y, EXCEPTION_VIOLET);
+}
+
+function interventionSectionHeading(doc: jsPDF, text: string, y: number) {
+  const withBreaks = text
+    .split("\n")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join(" ");
+  return bandSectionHeading(doc, withBreaks, y, INTERVENTION_RED);
 }
 
 const PDF_MARGIN_X = 14;
+/** Reserve space for footer on every page. */
+const PDF_BOTTOM_MARGIN = 22;
+/** Top Y on continuation pages (no report title block). */
+const PDF_CONTINUATION_TOP = 18;
+const PDF_TABLE_MARGIN = { left: 14, right: 14, bottom: PDF_BOTTOM_MARGIN };
 
-/** Draw wrapped text line-by-line; returns the Y position after the last line. */
+function pageHeight(doc: jsPDF): number {
+  return doc.internal.pageSize.getHeight();
+}
+
+/** Start a new page when the remaining vertical space is insufficient. */
+function ensureSpace(doc: jsPDF, y: number, requiredMm: number): number {
+  if (y + requiredMm <= pageHeight(doc) - PDF_BOTTOM_MARGIN) return y;
+  doc.addPage();
+  return PDF_CONTINUATION_TOP;
+}
+
+/** Cursor after jspdf-autotable — respects page breaks from the table. */
+function syncYAfterAutoTable(doc: jsPDF, gap = 8): number {
+  const finalY = (doc as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY;
+  if (finalY == null || Number.isNaN(finalY)) return PDF_CONTINUATION_TOP;
+  return ensureSpace(doc, finalY + gap, 4);
+}
+
+/** Estimate wrapped line count before drawing (for page-break planning). */
+function wrappedLineCount(doc: jsPDF, text: string, maxWidth: number, fontSize: number): number {
+  doc.setFontSize(fontSize);
+  return text
+    .split("\n")
+    .flatMap((segment) => {
+      const trimmed = segment.trim();
+      return trimmed ? doc.splitTextToSize(trimmed, maxWidth) : [];
+    }).length;
+}
+
+/** Coloured band heading; wraps long titles and avoids page-bottom clipping. */
+function bandSectionHeading(
+  doc: jsPDF,
+  text: string,
+  y: number,
+  fillColor: [number, number, number]
+): number {
+  const pw = doc.internal.pageSize.getWidth();
+  const barLeft = PDF_MARGIN_X;
+  const barWidth = pw - PDF_MARGIN_X * 2;
+  const textX = barLeft + 3;
+  const textMaxWidth = barWidth - 6;
+  const padTop = 2.5;
+  const lineHeight = 4.5;
+  const fontSize = 9;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(fontSize);
+  const lines = doc.splitTextToSize(text.trim().toUpperCase(), textMaxWidth);
+  const barHeight = padTop * 2 + lines.length * lineHeight;
+
+  y = ensureSpace(doc, y, barHeight + 6);
+
+  doc.setFillColor(...fillColor);
+  doc.rect(barLeft, y, barWidth, barHeight, "F");
+  doc.setTextColor(...WHITE);
+  lines.forEach((line: string, i: number) => {
+    doc.text(line, textX, y + padTop + lineHeight * (i + 0.85));
+  });
+  return y + barHeight + 4;
+}
+
+/** Draw wrapped text line-by-line with page breaks; returns Y after the last line. */
 function drawWrappedText(
   doc: jsPDF,
   text: string,
@@ -105,20 +173,59 @@ function drawWrappedText(
   doc.setFont("helvetica", options.fontStyle ?? "normal");
   doc.setFontSize(fontSize);
   if (options.color) doc.setTextColor(...options.color);
-  const lines = doc.splitTextToSize(text, maxWidth);
+  const lines = text
+    .split("\n")
+    .flatMap((segment) => {
+      const trimmed = segment.trim();
+      return trimmed ? doc.splitTextToSize(trimmed, maxWidth) : [];
+    });
   let cy = y;
   for (const line of lines) {
-    doc.text(line, x, cy, { maxWidth });
+    cy = ensureSpace(doc, cy, lineHeightMm + 1);
+    doc.setFont("helvetica", options.fontStyle ?? "normal");
+    doc.setFontSize(fontSize);
+    if (options.color) doc.setTextColor(...options.color);
+    // Lines are pre-wrapped — do not pass maxWidth here or jsPDF squeezes glyphs horizontally.
+    doc.text(line, x, cy);
     cy += lineHeightMm;
   }
   return cy;
+}
+
+/** Bulleted list with comfortable line spacing (PDF only). */
+function drawBulletList(
+  doc: jsPDF,
+  bullets: string[],
+  x: number,
+  y: number,
+  maxWidth: number,
+  options: {
+    fontSize?: number;
+    lineHeightMm?: number;
+    color?: [number, number, number];
+    afterGapMm?: number;
+  } = {}
+): number {
+  const fontSize = options.fontSize ?? 8;
+  const lineHeightMm = options.lineHeightMm ?? 5;
+  const afterGapMm = options.afterGapMm ?? 10;
+  const text = bullets.map((b) => `• ${b}`).join("\n");
+  const lineCount = wrappedLineCount(doc, text, maxWidth, fontSize);
+  y = ensureSpace(doc, y, lineCount * lineHeightMm + afterGapMm);
+  y =
+    drawWrappedText(doc, text, x, y, maxWidth, {
+      fontSize,
+      color: options.color ?? GRAY_DARK,
+      lineHeightMm,
+    }) + afterGapMm;
+  return y;
 }
 
 function programmeNotePanels(
   doc: jsPDF,
   y: number,
   pw: number,
-  notes: string[],
+  notes: ProgrammeExceptionNote[],
   panelColor: [number, number, number],
   accentColor: [number, number, number]
 ) {
@@ -127,37 +234,46 @@ function programmeNotePanels(
   const accentW = 2.8;
   const padX = 4;
   const padY = 5;
-  const lineHeightMm = 4.5;
+  const headingLineMm = 5;
+  const bodyLineMm = 4.5;
   const panelW = pw - marginL - marginR;
   const textX = marginL + accentW + padX;
   const textMaxW = panelW - accentW - padX;
-  const pageH = doc.internal.pageSize.getHeight();
-  const bottomMargin = 16;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
 
   for (const note of notes) {
-    const lines = doc.splitTextToSize(note, textMaxW);
-    const rowH = lines.length * lineHeightMm + padY * 2;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    const headingLines = doc.splitTextToSize(note.heading, textMaxW);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    const bodyLines = doc.splitTextToSize(note.narrative, textMaxW);
+    const rowH =
+      padY * 2 +
+      headingLines.length * headingLineMm +
+      2 +
+      bodyLines.length * bodyLineMm;
 
-    if (y + rowH > pageH - bottomMargin) {
-      doc.addPage();
-      y = marginL;
-    }
+    y = ensureSpace(doc, y, rowH + 4);
 
     doc.setFillColor(...panelColor);
     doc.roundedRect(marginL, y, panelW, rowH, 1.5, 1.5, "F");
     doc.setFillColor(...accentColor);
     doc.rect(marginL, y, accentW, rowH, "F");
 
+    let textY = y + padY;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(...GRAY_DARK);
+    for (const line of headingLines) {
+      doc.text(line, textX, textY);
+      textY += headingLineMm;
+    }
+    textY += 2;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    doc.setTextColor(...GRAY_DARK);
-    let textY = y + padY;
-    for (const line of lines) {
-      doc.text(line, textX, textY, { maxWidth: textMaxW });
-      textY += lineHeightMm;
+    for (const line of bodyLines) {
+      doc.text(line, textX, textY);
+      textY += bodyLineMm;
     }
     y += rowH + 4;
   }
@@ -166,7 +282,7 @@ function programmeNotePanels(
 
 // ─── General Report PDF ───────────────────────────────────────────────────────
 
-export function downloadGeneralReportPDF(report: {
+export function buildGeneralReportPDFDoc(report: {
   generatedAt: number;
   summary: {
     totalMDAs: number;
@@ -192,8 +308,8 @@ export function downloadGeneralReportPDF(report: {
     exceptionMdaCount: number;
     completionRate: number;
   }>;
-  exceptionProgramNotes: string[];
-}) {
+  exceptionProgramNotes: ProgrammeExceptionNote[];
+}): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
   const generatedDate = new Date(report.generatedAt).toLocaleDateString("en-GB", {
@@ -241,65 +357,73 @@ export function downloadGeneralReportPDF(report: {
 
   y = sectionHeading(doc, "MDAs by performance tier", y);
 
+  const tableContentWidth = pw - PDF_MARGIN_X * 2;
+
   for (const tierBlock of report.mdasByPerformanceTier) {
     if (tierBlock.mdas.length === 0) continue;
-    y = sectionHeading(doc, tierLabelWithPercentRange(tierBlock.label), y + 2);
+    const isPoorTier = tierBlock.label === "Poor";
+    y = ensureSpace(doc, y + 2, 14);
+    y = isPoorTier
+      ? interventionSectionHeading(doc, tierLabelWithPercentRange(tierBlock.label), y)
+      : sectionHeading(doc, tierLabelWithPercentRange(tierBlock.label), y);
     autoTable(doc, {
       startY: y,
       head: [["MDA", "Score", "Status"]],
       body: tierBlock.mdas.map((item) => [
         generalReportMdaNameWithAbbrev(item.mda),
         pct(item.score),
-        item.status.label,
+        isPoorTier ? "Requires Intervention" : item.status.label,
       ]),
-      styles: { fontSize: 8, cellPadding: 3 },
-      headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
-      alternateRowStyles: { fillColor: [248, 250, 252] },
+      styles: isPoorTier
+        ? { fontSize: 8, cellPadding: 3, textColor: INTERVENTION_RED, fontStyle: "bold" }
+        : { fontSize: 8, cellPadding: 3 },
+      headStyles: isPoorTier
+        ? { fillColor: INTERVENTION_RED, textColor: WHITE, fontStyle: "bold", fontSize: 8 }
+        : { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
+      alternateRowStyles: isPoorTier
+        ? { fillColor: INTERVENTION_RED_LIGHT }
+        : { fillColor: [248, 250, 252] },
       columnStyles: {
         0: { cellWidth: 88 },
         1: { cellWidth: 22 },
         2: { cellWidth: 56 },
       },
-      margin: { left: 14, right: 14 },
+      margin: PDF_TABLE_MARGIN,
+      rowPageBreak: "avoid",
     });
-    y = (doc as any).lastAutoTable.finalY + 8;
+    y = syncYAfterAutoTable(doc);
   }
 
   const bonusNarrativeBlocks = collectSuperMdaBonusNarrativeBlocks(report.mdasByPerformanceTier);
 
   if (bonusNarrativeBlocks.length > 0) {
+    y = syncYAfterAutoTable(doc, 12);
+    y = ensureSpace(doc, y, 20);
     y = sectionHeading(doc, "Super MDA — regulatory simplification submissions", y);
-    y =
-      drawWrappedText(
-        doc,
-        "NPA and NCS validated bonus-point claims under the BEEPA Weighted Reform Framework (regulatory simplification cluster).",
-        PDF_MARGIN_X,
-        y,
-        pw - PDF_MARGIN_X * 2,
-        { fontSize: 8,
-          color: GRAY_MID,
-          lineHeightMm: 4 }
-      ) + 4;
+    y += 4;
 
-    for (const block of bonusNarrativeBlocks) {
+    for (let i = 0; i < bonusNarrativeBlocks.length; i++) {
+      const block = bonusNarrativeBlocks[i];
+      y = ensureSpace(doc, y, 20);
+
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(9);
+      doc.setFontSize(10);
       doc.setTextColor(...GRAY_DARK);
-      doc.text(`${block.abbrev} — ${block.name}`, 14, y);
-      y += 5;
+      doc.text(`${block.abbrev} — ${block.name}`, PDF_MARGIN_X, y);
+      y += 7;
+
       if (block.narrative.title) {
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(8);
-        doc.setTextColor(...PEBEC_GREEN);
         y =
-          drawWrappedText(doc, block.narrative.title, PDF_MARGIN_X, y, pw - PDF_MARGIN_X * 2, {
+          drawWrappedText(doc, block.narrative.title, PDF_MARGIN_X, y, tableContentWidth, {
             fontSize: 8,
             fontStyle: "bold",
             color: PEBEC_GREEN,
-            lineHeightMm: 4,
-          }) + 2;
+            lineHeightMm: 5,
+          }) + 5;
       }
+
       if (block.narrative.submissionRows && block.narrative.submissionRows.length > 0) {
+        y = ensureSpace(doc, y, 28);
         autoTable(doc, {
           startY: y,
           head: [["Activity / measure", "Compliance level", "Evidence / reference"]],
@@ -308,29 +432,48 @@ export function downloadGeneralReportPDF(report: {
             row.complianceLevel,
             row.evidenceAvailable,
           ]),
-          styles: { fontSize: 7, cellPadding: 2 },
+          styles: {
+            fontSize: 7,
+            cellPadding: 3,
+            overflow: "linebreak",
+            valign: "top",
+          },
           headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 7 },
           alternateRowStyles: { fillColor: [248, 250, 252] },
-          columnStyles: { 0: { cellWidth: 58 }, 1: { cellWidth: 58 } },
-          margin: { left: 14, right: 14 },
+          tableWidth: tableContentWidth,
+          columnStyles: {
+            0: { cellWidth: tableContentWidth * 0.32 },
+            1: { cellWidth: tableContentWidth * 0.36 },
+            2: { cellWidth: tableContentWidth * 0.32 },
+          },
+          margin: PDF_TABLE_MARGIN,
+          rowPageBreak: "avoid",
         });
-        y = (doc as any).lastAutoTable.finalY + 6;
+        y = syncYAfterAutoTable(doc, 12);
       }
+
       if (block.narrative.bullets && block.narrative.bullets.length > 0) {
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
-        doc.setTextColor(...GRAY_DARK);
-        const bulletText = block.narrative.bullets.map((b) => `• ${b}`).join("\n");
-        y =
-          drawWrappedText(doc, bulletText, PDF_MARGIN_X, y, pw - PDF_MARGIN_X * 2, {
-            fontSize: 8,
-            color: GRAY_DARK,
-            lineHeightMm: 4,
-          }) + 6;
+        y = drawBulletList(doc, block.narrative.bullets, PDF_MARGIN_X, y, tableContentWidth, {
+          lineHeightMm: 5,
+          afterGapMm: 10,
+        });
+      }
+
+      if (i < bonusNarrativeBlocks.length - 1) {
+        y += 4;
+        doc.setDrawColor(...GRAY_LIGHT);
+        doc.setLineWidth(0.2);
+        doc.line(PDF_MARGIN_X, y, pw - PDF_MARGIN_X, y);
+        y += 8;
+      } else {
+        y += 6;
       }
     }
   }
 
+  y = syncYAfterAutoTable(doc, 14);
+  y += 10;
+  y = ensureSpace(doc, y, 22);
   y = sectionHeading(doc, "Reform areas and completion rate", y);
   autoTable(doc, {
     startY: y,
@@ -358,7 +501,8 @@ export function downloadGeneralReportPDF(report: {
       4: { cellWidth: 18 },
       5: { cellWidth: 18 },
     },
-    margin: { left: 14, right: 14 },
+    margin: PDF_TABLE_MARGIN,
+    rowPageBreak: "avoid",
     didParseCell: (data) => {
       if (data.section === "head") {
         const idx = data.column.index;
@@ -378,12 +522,12 @@ export function downloadGeneralReportPDF(report: {
       if (idx === 5) data.cell.styles.fillColor = EXCEPTION_CELL_BG;
     },
   });
-  y = (doc as any).lastAutoTable.finalY + 8;
+  y = syncYAfterAutoTable(doc);
 
   const exceptionProgramNotes = report.exceptionProgramNotes ?? [];
   if (exceptionProgramNotes.length > 0) {
-    y += 2;
-    y = exceptionSectionHeading(doc, "Programme exceptions", y);
+    y = ensureSpace(doc, y + 2, 14);
+    y = exceptionSectionHeading(doc, "Programme Exemptions", y);
 
     y = programmeNotePanels(
       doc,
@@ -409,6 +553,18 @@ export function downloadGeneralReportPDF(report: {
     );
   }
 
+  return doc;
+}
+
+export function downloadGeneralReportPDF(
+  report: Parameters<typeof buildGeneralReportPDFDoc>[0]
+): void {
+  const doc = buildGeneralReportPDFDoc(report);
+  const generatedDate = new Date(report.generatedAt).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
   doc.save(`BEEPA-General-Report-${generatedDate.replace(/ /g, "-")}.pdf`);
 }
 

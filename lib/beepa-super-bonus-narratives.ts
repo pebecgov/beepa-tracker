@@ -86,6 +86,74 @@ export const SUPER_MDA_BONUS_NARRATIVES: Record<string, SuperMdaBonusNarrative> 
       "Pillar 5 — Customs agent licensing digitalization Phase 1 (RS-11), bonded warehouse document consolidation (RS-12).",
     ],
   },
+  PENCOM: {
+    title:
+      "BEEPA bonus points — regulatory simplification (data recapture documents + pay-out approval ceding)",
+    tierDescription:
+      "Two Commission circulars evidencing document reduction for RSA data recapture and delegation of pay-out approvals to Licensed PFAs with timeline reduction; satisfies RS Criteria A, B, and C.",
+    submissionRows: [
+      {
+        activity:
+          "Reduction in regulatory requirements or documents (Criterion A) — RSA data recapture exercise.",
+        complianceLevel:
+          "Commission streamlined documents PFAs must obtain from RSA holders (active contributors, retirees, and holders with name/date-of-birth changes) following deployment of the Enhanced Contributor Registration System (ECRS).",
+        evidenceAvailable:
+          "PenCom/TECH/NDM/2026/48 to all Licensed Pension Fund Administrators, 16 February 2026 (Commission website; Appendix 1).",
+      },
+      {
+        activity:
+          "Elimination of redundant approvals or steps within process (Criterion B) — ceding of pay-out approvals to PFAs.",
+        complianceLevel:
+          "Commission ceased central validation and No-Objection approval for eleven pay-out categories (programmed withdrawal, retiree life annuity, temporary loss of employment, en bloc, pre-PRA benefits, voluntary contributions, mortgage equity, NSITF transfers, periodicity changes, employer remittance error resolution, refunds for persons exempted under PRA 2014); Licensed PFAs process pay-outs without Commission No-Objection on each case.",
+        evidenceAvailable:
+          "PenCom/INSP/Surv/Aut/451 to all Licensed Pension Fund Administrators, 12 March 2025 (Commission website; Appendix 2).",
+      },
+      {
+        activity:
+          "Simplification of procedures that reduces time or complexity for applicants (Criterion C).",
+        complianceLevel:
+          "Pay-out approval cycle reduced from 3–5 working days to 2 working days; data recapture enables RSA holders to correct legacy CRS records and complete NIN-authenticated identity updates.",
+        evidenceAvailable:
+          "Same circulars; pay-out ceding measure aligns Criterion B and C on a single published reform.",
+      },
+    ],
+    bullets: [
+      "Data recapture: complete and accurate RSA holder details, NIN authentication via NIMC, correction of legacy CRS data, and isolation of duplicate RSA registrations.",
+      "Pay-out types covered: programmed withdrawal, life annuity, temporary loss of employment, en bloc, pre-PRA benefits, voluntary contributions, mortgage equity, NSITF transfers, periodicity changes, employer error resolution, exempt-person refunds.",
+    ],
+  },
+  NITDA: {
+    title:
+      "BEEPA bonus points — regulatory simplification (IT Project Clearance + IICP registration; 5 May 2026)",
+    tierDescription:
+      "Two published service simplifications (IT Project Clearance Guideline and IT Company/Service Providers registration) in Service Charter 6th Edition 2026 and on nitda.gov.ng; satisfies RS Criteria A, B, and C.",
+    submissionRows: [
+      {
+        activity:
+          "Reduction in regulatory requirements or documents (Criterion A) — IT Project Clearance.",
+        complianceLevel:
+          "2018 manual FORM ITC.1 and written correspondence replaced by public guideline on nitda.gov.ng, electronic portal workflow, standardized checklist, and threshold: only IT projects from N10,000,000 and above require clearance.",
+        evidenceAvailable:
+          "IT Project Clearance Guideline; Service Charter 6th Edition 2026 (nitda.gov.ng). PEBEC letter 5 May 2026.",
+      },
+      {
+        activity:
+          "Elimination of redundant approvals or steps (Criterion B) — risk-based processing and default approval.",
+        complianceLevel:
+          "Risk/threshold categorization avoids over-processing minor requests; explicit default approval on day 5 after verification when no acknowledgement or request for information; IICP default approval within one working day after complete submission if no MDA action.",
+        evidenceAvailable:
+          "Before/after comparison tables in NITDA submission to PEBEC DG; BFA monthly reports March–April 2026 cited as supplementary evidence.",
+      },
+      {
+        activity:
+          "Simplification of procedures that reduces time or complexity (Criterion C).",
+        complianceLevel:
+          "IT Project Clearance SLA reduced from 20 working days (2018) to 10 working days (2026); digital notifications and clearance letter posted to FPI; IICP registration SLA reduced from 3 working days to 2 working days with decomposed stages in Service Charter.",
+        evidenceAvailable:
+          "Service Charter 6th Edition 2026; IT Project Clearance Guideline (published simplifications per NITDA letter).",
+      },
+    ],
+  },
 };
 
 export function collectSuperMdaBonusNarrativeBlocks(

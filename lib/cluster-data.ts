@@ -46,7 +46,9 @@ export const CLUSTERS: Cluster[] = [
         members: [
             { name: "Bureau for Public Procurement (BPP)" },
             { name: "National Bureau of Statistics (NBS)" },
-            { name: "Ministry of Interior - Citizenship and Business Development Department (CBDD)" },
+            {
+              name: "Citizenship and Business Department (CBD) within the Ministry of Interior",
+            },
             { name: "Corporate Affairs Commission (CAC)" },
             { name: "EFCC – Special Control Unit for Money Laundering (SCUML)" },
             { name: "Industrial Training Fund (ITF)" },
