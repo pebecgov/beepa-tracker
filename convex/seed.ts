@@ -45,7 +45,10 @@ const PEBEC_MDAS = [
   { name: "Nigerian Electricity Regulatory Commission", abbreviation: "NERC" },
 
   // Petroleum Industry Services Coordination Committee
-  { name: "Nigerian Content Development Management Board", abbreviation: "NCDMB" },
+  {
+    name: "Nigerian Content Development and Monitoring Board",
+    abbreviation: "NCDMB",
+  },
   { name: "Nigerian Midstream and Downstream Petroleum Regulatory Authority", abbreviation: "NMDPRA" },
   { name: "Nigerian Upstream Petroleum Regulatory Commission", abbreviation: "NUPRC" },
 
@@ -393,6 +396,9 @@ export const syncFramework = mutation({
           mdaByName.get(
             "Citizenship and Business Development Department (CBDD) within the Ministry of Interior"
           );
+      }
+      if (!mda && mdaInfo.abbreviation === "NCDMB") {
+        mda = mdaByName.get("Nigerian Content Development Management Board");
       }
       if (!mda) {
         const mdaId = await ctx.db.insert("mdas", {
