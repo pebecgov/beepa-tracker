@@ -1,5 +1,6 @@
-import { query } from "./_generated/server";
+import { query, type QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
+import type { Doc } from "./_generated/dataModel";
 import {
   reformCountsTowardMdaScore,
   activityCountsTowardMdaScore,
@@ -97,26 +98,10 @@ export const getReformPerformance = query({
   },
 });
 
-// Get admin report card for one MDA
-export const getMDAReportCard = query({
-  args: { mdaId: v.id("mdas") },
-  handler: async (ctx, args) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) return null;
-
-    const currentUser = await ctx.db
-      .query("users")
-      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
-      .first();
-
-    if (!currentUser || currentUser.role !== "admin") return null;
-
-    const mda = await ctx.db.get(args.mdaId);
-    if (!mda) throw new Error("MDA not found");
-
+async function buildMdaReportCard(ctx: QueryCtx, mda: Doc<"mdas">) {
     const reforms = await ctx.db
       .query("reforms")
-      .withIndex("by_mda", (q) => q.eq("mdaId", args.mdaId))
+      .withIndex("by_mda", (q) => q.eq("mdaId", mda._id))
       .collect();
 
     const reformRows = await Promise.all(
@@ -252,6 +237,51 @@ export const getMDAReportCard = query({
       reformRows,
       weakestReforms,
     };
+}
+
+// Get admin report card for one MDA
+export const getMDAReportCard = query({
+  args: { mdaId: v.id("mdas") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const currentUser = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+
+    if (!currentUser || currentUser.role !== "admin") return null;
+
+    const mda = await ctx.db.get(args.mdaId);
+    if (!mda) throw new Error("MDA not found");
+
+    return buildMdaReportCard(ctx, mda);
+  },
+});
+
+// All MDA scorecards for batch PDF export (admin only)
+export const getAllMDAReportCards = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return null;
+
+    const currentUser = await ctx.db
+      .query("users")
+      .withIndex("by_clerk_id", (q) => q.eq("clerkId", identity.subject))
+      .first();
+
+    if (!currentUser || currentUser.role !== "admin") return null;
+
+    const mdas = await ctx.db.query("mdas").collect();
+    mdas.sort((a, b) =>
+      (a.abbreviation || a.name).localeCompare(b.abbreviation || b.name, "en", {
+        sensitivity: "base",
+      })
+    );
+
+    return Promise.all(mdas.map((mda) => buildMdaReportCard(ctx, mda)));
   },
 });
 

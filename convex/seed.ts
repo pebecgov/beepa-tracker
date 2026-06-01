@@ -89,7 +89,7 @@ const PEBEC_MDAS = [
 
   // Commercial Communications & Consumer Protection Committee
   { name: "Advertising Regulatory Council of Nigeria", abbreviation: "ARCON" },
-  { name: "Nigeria Broadcasting Commission", abbreviation: "NBC" },
+  { name: "National Broadcasting Commission", abbreviation: "NBC" },
 ];
 
 // Total counts for reference
@@ -399,6 +399,9 @@ export const syncFramework = mutation({
       }
       if (!mda && mdaInfo.abbreviation === "NCDMB") {
         mda = mdaByName.get("Nigerian Content Development Management Board");
+      }
+      if (!mda && mdaInfo.abbreviation === "NBC") {
+        mda = mdaByName.get("Nigeria Broadcasting Commission");
       }
       if (!mda) {
         const mdaId = await ctx.db.insert("mdas", {

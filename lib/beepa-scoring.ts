@@ -172,7 +172,7 @@ export const BEEPA_PROGRAMME_EXCEPTION_NOTES: readonly ProgrammeExceptionNote[] 
   {
     heading: "Nigeria Revenue Service (NRS)",
     narrative:
-      "The Nigeria Revenue Service (NRS) was granted a temporary exemption in light of the ongoing transition from the Federal Inland Revenue Service (FIRS) to the NRS, the restructuring of its internal systems, and the operational demands associated with implementing the new tax law.",
+      "The Nigeria Revenue Service (NRS) was granted a temporary exemption from the current BEEPA assessment cycle in light of the ongoing transition from the Federal Inland Revenue Service (FIRS) to the NRS, the restructuring of its internal systems, and the operational demands associated with implementing the new tax law. NRS was also granted a one-month extension from the official end of the BEEPA programme period.",
   },
   {
     heading: "Central Bank of Nigeria (CBN)",

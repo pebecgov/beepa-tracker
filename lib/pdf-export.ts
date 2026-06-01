@@ -3,6 +3,7 @@
 
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import JSZip from "jszip";
 
 import {
   generalReportMdaNameWithAbbrev,
@@ -10,6 +11,22 @@ import {
   type ProgrammeExceptionNote,
 } from "./beepa-scoring";
 import { collectSuperMdaBonusNarrativeBlocks } from "./beepa-super-bonus-narratives";
+import {
+  contactVerificationAttemptSummary,
+  contactVerificationClosingNote,
+  contactVerificationDetailsSectionTitle,
+  contactVerificationFindingRows,
+  contactVerificationOutcomeSectionTitle,
+  contactVerificationOutcomeNarrative,
+  contactVerificationPageTitle,
+  filterContactVerificationScorecards,
+  resolveMdaContactVerification,
+  type MdaContactVerificationRecord,
+} from "./mda-contact-verification";
+import {
+  resolveProgrammeExemptionSupplement,
+  type ProgrammeExemptionSupplementRecord,
+} from "./mda-programme-exemption-supplement";
 
 // ─── colours ────────────────────────────────────────────────────────────────
 const PEBEC_GREEN: [number, number, number] = [0, 107, 63];
@@ -34,39 +51,224 @@ function pct(v: number) {
   return `${Math.round(v * 100)}%`;
 }
 
-function addPageHeader(doc: jsPDF, title: string, subtitle: string, dateStr: string) {
-  const pw = doc.internal.pageSize.getWidth();
+/** Official date shown on BEEPA PDF exports (headers, footers, filenames). */
+const BEEPA_PDF_GENERATED_DATE = new Date(2026, 4, 22);
 
-  // green accent bar
+function formatPdfGeneratedDate(): string {
+  return BEEPA_PDF_GENERATED_DATE.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function pdfGeneratedDateFilenamePart(): string {
+  return formatPdfGeneratedDate().replace(/ /g, "-");
+}
+
+/** Page header with wrapped title; returns Y for body content below the header rule. */
+function addPageHeader(doc: jsPDF, title: string, subtitle: string, dateStr: string): number {
+  const pw = doc.internal.pageSize.getWidth();
+  const marginX = 14;
+  const titleMaxWidth = pw - marginX * 2;
+  const subtitleMaxWidth = pw - marginX * 2 - 48;
+  const titleFontSize = 11;
+  const titleLineHeight = 4.8;
+  const subtitleFontSize = 8;
+  const subtitleLineHeight = 4;
+  const brandY = 17;
+  const titleStartY = 25;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(titleFontSize);
+  const titleLines = title
+    .split("\n")
+    .flatMap((segment) => {
+      const trimmed = segment.trim();
+      return trimmed ? doc.splitTextToSize(trimmed, titleMaxWidth) : [];
+    });
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(subtitleFontSize);
+  const subtitleLines = doc.splitTextToSize(subtitle, subtitleMaxWidth);
+
+  const subtitleY = titleStartY + titleLines.length * titleLineHeight + 3;
+  const headerBottom =
+    Math.max(subtitleY + subtitleLines.length * subtitleLineHeight, subtitleY + subtitleLineHeight) + 5;
+
   doc.setFillColor(...PEBEC_GREEN);
   doc.rect(0, 0, pw, 6, "F");
 
-  // title block
   doc.setFillColor(...PEBEC_GREEN_LIGHT);
-  doc.rect(0, 6, pw, 30, "F");
+  doc.rect(0, 6, pw, headerBottom - 6, "F");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
   doc.setTextColor(...PEBEC_GREEN);
-  doc.text("PEBEC  —  BEEPA Reform Tracker", 14, 18);
+  doc.text("PEBEC  —  BEEPA Reform Tracker", marginX, brandY);
 
-  doc.setFontSize(11);
+  doc.setFontSize(titleFontSize);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...GRAY_DARK);
-  doc.text(title, 14, 27);
+  titleLines.forEach((line: string, i: number) => {
+    doc.text(line, marginX, titleStartY + i * titleLineHeight);
+  });
+
+  doc.setFontSize(subtitleFontSize);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...GRAY_MID);
+  subtitleLines.forEach((line: string, i: number) => {
+    doc.text(line, marginX, subtitleY + i * subtitleLineHeight);
+  });
+  doc.text(dateStr, pw - marginX, subtitleY, { align: "right" });
+
+  doc.setDrawColor(...PEBEC_GREEN);
+  doc.setLineWidth(0.4);
+  doc.line(0, headerBottom, pw, headerBottom);
+
+  return headerBottom + 8;
+}
+
+/** Bold helvetica measures narrower than it renders; wrap below jsPDF’s “fits one line” width. */
+const SCORECARD_MDA_NAME_WRAP_MM = 118;
+
+function wrapHeaderLines(
+  doc: jsPDF,
+  text: string,
+  maxWidth: number,
+  fontStyle: "normal" | "bold",
+  fontSize: number
+): string[] {
+  doc.setFont("helvetica", fontStyle);
+  doc.setFontSize(fontSize);
+  return text
+    .split("\n")
+    .flatMap((segment) => {
+      const trimmed = segment.trim();
+      return trimmed ? doc.splitTextToSize(trimmed, maxWidth) : [];
+    });
+}
+
+/** Scorecard header: label + wrapped full MDA name (avoids single-line overflow). */
+function addScorecardPageHeader(
+  doc: jsPDF,
+  mda: { name: string; abbreviation?: string | null },
+  subtitle: string,
+  dateStr: string
+): number {
+  const pw = doc.internal.pageSize.getWidth();
+  const marginX = PDF_MARGIN_X;
+  const contentWidth = pw - marginX * 2;
+  const nameWrapWidth = Math.min(contentWidth, SCORECARD_MDA_NAME_WRAP_MM);
+  const labelLineHeight = 5.5;
+  const nameLineHeight = 5.2;
+  const subtitleLineHeight = 4;
+  const brandY = 17;
+  const labelY = 25;
+
+  const labelLines = wrapHeaderLines(doc, "Individual MDA Scorecard", contentWidth, "bold", 11);
+  const nameLines = wrapHeaderLines(doc, mda.name, nameWrapWidth, "bold", 10);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  const subtitleLines = doc.splitTextToSize(subtitle, contentWidth - 50);
+
+  const nameStartY = labelY + labelLines.length * labelLineHeight;
+  const subtitleY = nameStartY + nameLines.length * nameLineHeight + 3;
+  const headerBottom =
+    Math.max(subtitleY + subtitleLines.length * subtitleLineHeight, subtitleY + subtitleLineHeight) + 5;
+
+  doc.setFillColor(...PEBEC_GREEN);
+  doc.rect(0, 0, pw, 6, "F");
+
+  doc.setFillColor(...PEBEC_GREEN_LIGHT);
+  doc.rect(0, 6, pw, headerBottom - 6, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(...PEBEC_GREEN);
+  doc.text("PEBEC  —  BEEPA Reform Tracker", marginX, brandY);
+
+  doc.setFontSize(11);
+  doc.setTextColor(...GRAY_DARK);
+  labelLines.forEach((line: string, i: number) => {
+    doc.text(line, marginX, labelY + i * labelLineHeight);
+  });
+
+  doc.setFontSize(10);
+  nameLines.forEach((line: string, i: number) => {
+    doc.text(line, marginX, nameStartY + i * nameLineHeight);
+  });
 
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(...GRAY_MID);
-  doc.text(subtitle, 14, 33);
+  subtitleLines.forEach((line: string, i: number) => {
+    doc.text(line, marginX, subtitleY + i * subtitleLineHeight);
+  });
+  doc.text(dateStr, pw - marginX, subtitleY, { align: "right" });
 
-  // date – right aligned
-  doc.text(dateStr, pw - 14, 33, { align: "right" });
-
-  // bottom border of header
   doc.setDrawColor(...PEBEC_GREEN);
   doc.setLineWidth(0.4);
-  doc.line(0, 36, pw, 36);
+  doc.line(0, headerBottom, pw, headerBottom);
+
+  return headerBottom + 8;
+}
+
+/** Standalone supplement header (separate page; not the main scorecard header). */
+function addScorecardSupplementPageHeader(
+  doc: jsPDF,
+  mda: { name: string; abbreviation?: string | null },
+  dateStr: string,
+  pageTitle: string
+): number {
+  const pw = doc.internal.pageSize.getWidth();
+  const marginX = PDF_MARGIN_X;
+  const contentWidth = pw - marginX * 2;
+  const nameWrapWidth = Math.min(contentWidth, SCORECARD_MDA_NAME_WRAP_MM);
+  const labelLineHeight = 5.5;
+  const nameLineHeight = 5.2;
+  const brandY = 17;
+  const labelY = 25;
+
+  const labelLines = wrapHeaderLines(doc, pageTitle, contentWidth, "bold", 11);
+  const nameLines = wrapHeaderLines(doc, mda.name, nameWrapWidth, "bold", 10);
+
+  const nameStartY = labelY + labelLines.length * labelLineHeight;
+  const headerBottom = nameStartY + nameLines.length * nameLineHeight + 5;
+
+  doc.setFillColor(...PEBEC_GREEN);
+  doc.rect(0, 0, pw, 6, "F");
+
+  doc.setFillColor(...PEBEC_GREEN_LIGHT);
+  doc.rect(0, 6, pw, headerBottom - 6, "F");
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.setTextColor(...PEBEC_GREEN);
+  doc.text("PEBEC  —  BEEPA Reform Tracker", marginX, brandY);
+
+  doc.setFontSize(11);
+  doc.setTextColor(...GRAY_DARK);
+  labelLines.forEach((line: string, i: number) => {
+    doc.text(line, marginX, labelY + i * labelLineHeight);
+  });
+
+  doc.setFontSize(10);
+  nameLines.forEach((line: string, i: number) => {
+    doc.text(line, marginX, nameStartY + i * nameLineHeight);
+  });
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.setTextColor(...GRAY_MID);
+  doc.text(dateStr, pw - marginX, headerBottom - 2, { align: "right" });
+
+  doc.setDrawColor(...PEBEC_GREEN);
+  doc.setLineWidth(0.4);
+  doc.line(0, headerBottom, pw, headerBottom);
+
+  return headerBottom + 8;
 }
 
 function sectionHeading(doc: jsPDF, text: string, y: number) {
@@ -312,20 +514,14 @@ export function buildGeneralReportPDFDoc(report: {
 }): jsPDF {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
-  const generatedDate = new Date(report.generatedAt).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  const generatedDate = formatPdfGeneratedDate();
 
-  addPageHeader(
+  let y = addPageHeader(
     doc,
     "BEEPA Programme Performance Report",
     "General Report  ·  Admin View",
     `Generated: ${generatedDate}`
   );
-
-  let y = 44;
 
   const stats = [
     { label: "Overall score", value: pct(report.summary.overallScore) },
@@ -560,16 +756,11 @@ export function downloadGeneralReportPDF(
   report: Parameters<typeof buildGeneralReportPDFDoc>[0]
 ): void {
   const doc = buildGeneralReportPDFDoc(report);
-  const generatedDate = new Date(report.generatedAt).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-  doc.save(`BEEPA-General-Report-${generatedDate.replace(/ /g, "-")}.pdf`);
+  doc.save(`BEEPA-General-Report-${pdfGeneratedDateFilenamePart()}.pdf`);
 }
 
 // ─── Individual MDA Scorecard PDF ────────────────────────────────────────────
-export function downloadScorecardPDF(scorecard: {
+export type ScorecardPDFInput = {
   generatedAt: number;
   mda: { name: string; abbreviation?: string | null };
   score: number;
@@ -586,7 +777,6 @@ export function downloadScorecardPDF(scorecard: {
     exceptionReformCount: number;
     exceptionActivityCount: number;
   };
-  weakestReforms: Array<{ refNumber: number; name: string; score: number }>;
   reformRows: Array<{
     reform: { refNumber: number; name: string };
     score: number;
@@ -604,27 +794,142 @@ export function downloadScorecardPDF(scorecard: {
       countsTowardScore: boolean;
     }>;
   }>;
-}) {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+};
+
+/** Appends one standalone page after the scorecard (any page count); contact verification only. */
+function appendContactVerificationPage(
+  doc: jsPDF,
+  scorecard: ScorecardPDFInput,
+  record: MdaContactVerificationRecord,
+  generatedDate: string
+): void {
+  doc.addPage();
   const pw = doc.internal.pageSize.getWidth();
-  const generatedDate = new Date(scorecard.generatedAt).toLocaleDateString("en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
+  const marginX = 14;
+  const contentWidth = pw - marginX * 2;
+
+  let y = addScorecardSupplementPageHeader(
+    doc,
+    scorecard.mda,
+    `Generated: ${generatedDate}`,
+    contactVerificationPageTitle(record.channel)
+  );
+
+  y = sectionHeading(doc, contactVerificationOutcomeSectionTitle(record.channel), y);
+  y =
+    drawWrappedText(
+      doc,
+      contactVerificationOutcomeNarrative(record.channel),
+      marginX,
+      y,
+      contentWidth,
+      { fontSize: 9, lineHeightMm: 5, color: GRAY_DARK }
+    ) + 4;
+
+  y = sectionHeading(doc, "Assessment basis", y);
+  y = drawBulletList(
+    doc,
+    contactVerificationAttemptSummary(record.channel),
+    marginX,
+    y,
+    contentWidth,
+    { fontSize: 8, lineHeightMm: 5, afterGapMm: 6 }
+  );
+
+  y = sectionHeading(doc, contactVerificationDetailsSectionTitle(record.channel), y);
+  const contactRows = contactVerificationFindingRows(record);
+
+  autoTable(doc, {
+    startY: y,
+    head: [["Item", "Detail"]],
+    body: contactRows,
+    styles: { fontSize: 8, cellPadding: 2.5 },
+    headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { cellWidth: 28 },
+    },
+    margin: { left: marginX, right: marginX },
   });
 
-  const mdaLabel = [scorecard.mda.abbreviation, scorecard.mda.name]
-    .filter(Boolean)
-    .join("  ·  ");
+  y = (doc as any).lastAutoTable.finalY + 8;
+  const closingNote = contactVerificationClosingNote(record.channel);
+  if (closingNote) {
+    drawWrappedText(doc, closingNote, marginX, y, contentWidth, {
+      fontSize: 8,
+      lineHeightMm: 4.5,
+      color: GRAY_MID,
+    });
+  }
+}
 
-  addPageHeader(
+function appendProgrammeExemptionPage(
+  doc: jsPDF,
+  scorecard: ScorecardPDFInput,
+  record: ProgrammeExemptionSupplementRecord,
+  generatedDate: string
+): void {
+  doc.addPage();
+  const marginX = 14;
+  const contentWidth = doc.internal.pageSize.getWidth() - marginX * 2;
+
+  let y = addScorecardSupplementPageHeader(
     doc,
-    `Individual MDA Scorecard: ${mdaLabel}`,
+    scorecard.mda,
+    `Generated: ${generatedDate}`,
+    record.pageTitle
+  );
+
+  y = sectionHeading(doc, "Exemption summary", y);
+  y =
+    drawWrappedText(doc, record.summaryNarrative, marginX, y, contentWidth, {
+      fontSize: 9,
+      lineHeightMm: 5,
+      color: GRAY_DARK,
+    }) + 4;
+
+  y = sectionHeading(doc, "Assessment basis", y);
+  y = drawBulletList(doc, record.basisBullets, marginX, y, contentWidth, {
+    fontSize: 8,
+    lineHeightMm: 5,
+    afterGapMm: 6,
+  });
+
+  y = sectionHeading(doc, "Exemption details", y);
+  autoTable(doc, {
+    startY: y,
+    head: [["Item", "Detail"]],
+    body: record.findingRows.map(([label, detail]) => [label, detail]),
+    styles: { fontSize: 8, cellPadding: 2.5 },
+    headStyles: { fillColor: PEBEC_GREEN, textColor: WHITE, fontStyle: "bold", fontSize: 8 },
+    alternateRowStyles: { fillColor: [248, 250, 252] },
+    columnStyles: {
+      0: { cellWidth: 28 },
+    },
+    margin: { left: marginX, right: marginX },
+  });
+}
+
+function scorecardPdfFooterLabel(mda: { name: string; abbreviation?: string | null }): string {
+  return mda.name.trim() || mda.abbreviation?.trim() || "MDA";
+}
+
+function scorecardPdfFilename(scorecard: ScorecardPDFInput): string {
+  const safeName = (scorecard.mda.abbreviation || scorecard.mda.name).replace(/[^a-z0-9]/gi, "-");
+  return `BEEPA-Scorecard-${safeName}-${pdfGeneratedDateFilenamePart()}.pdf`;
+}
+
+export function buildScorecardPDFDoc(scorecard: ScorecardPDFInput): jsPDF {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const pw = doc.internal.pageSize.getWidth();
+  const generatedDate = formatPdfGeneratedDate();
+
+  let y = addScorecardPageHeader(
+    doc,
+    scorecard.mda,
     `Tier: ${tierLabelWithPercentRange(scorecard.tier.label)}  ·  Status: ${scorecard.status.label}  ·  Score: ${pct(scorecard.score)}`,
     `Generated: ${generatedDate}`
   );
-
-  let y = 44;
 
   // ── Summary stat boxes ────────────────────────────────────────────────────
   const stats = [
@@ -650,25 +955,6 @@ export function downloadScorecardPDF(scorecard: {
     doc.text(stat.value, bx + 2, y + 12);
   });
   y += 22;
-
-  // ── PEBEC Notes ───────────────────────────────────────────────────────────
-  if (scorecard.weakestReforms.length > 0) {
-    y = sectionHeading(doc, "PEBEC Follow-up Notes", y);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...GRAY_MID);
-    doc.text("Priority reforms requiring attention:", 14, y);
-    y += 5;
-    scorecard.weakestReforms.forEach((r) => {
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(...GRAY_DARK);
-      doc.text(`  Reform ${r.refNumber}:`, 14, y);
-      doc.setFont("helvetica", "normal");
-      doc.text(`${r.name}  (${pct(r.score)})`, 36, y);
-      y += 5;
-    });
-    y += 4;
-  }
 
   // ── Reform Score Breakdown ─────────────────────────────────────────────────
   y = sectionHeading(doc, "Reform Score Breakdown", y);
@@ -734,21 +1020,72 @@ export function downloadScorecardPDF(scorecard: {
     y = (doc as any).lastAutoTable.finalY + 8;
   }
 
+  const contactVerification = resolveMdaContactVerification(scorecard.mda);
+  const programmeExemption = resolveProgrammeExemptionSupplement(scorecard.mda);
+  if (contactVerification) {
+    appendContactVerificationPage(doc, scorecard, contactVerification, generatedDate);
+  } else if (programmeExemption) {
+    appendProgrammeExemptionPage(doc, scorecard, programmeExemption, generatedDate);
+  }
+
+  const supplementFooterTag = contactVerification
+    ? "Contact verification"
+    : programmeExemption
+      ? "Programme exemption"
+      : null;
+
   // ── Page numbers ──────────────────────────────────────────────────────────
   const totalPages = (doc as any).internal.getNumberOfPages();
+  const supplementPage = supplementFooterTag ? totalPages : null;
+  const footerMdaLabel = scorecardPdfFooterLabel(scorecard.mda);
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7);
     doc.setTextColor(...GRAY_MID);
-    doc.text(
-      `Page ${i} of ${totalPages}  ·  ${scorecard.mda.abbreviation || scorecard.mda.name}  ·  PEBEC — Confidential`,
-      pw / 2,
-      doc.internal.pageSize.getHeight() - 6,
-      { align: "center" }
-    );
+    const pageLabel =
+      i === supplementPage && supplementFooterTag
+        ? `Page ${i} of ${totalPages}  ·  ${footerMdaLabel}  ·  ${supplementFooterTag}  ·  PEBEC — Confidential`
+        : `Page ${i} of ${totalPages}  ·  ${footerMdaLabel}  ·  PEBEC — Confidential`;
+    doc.text(pageLabel, pw / 2, doc.internal.pageSize.getHeight() - 6, { align: "center" });
   }
 
-  const safeName = (scorecard.mda.abbreviation || scorecard.mda.name).replace(/[^a-z0-9]/gi, "-");
-  doc.save(`BEEPA-Scorecard-${safeName}-${generatedDate.replace(/ /g, "-")}.pdf`);
+  return doc;
+}
+
+export function downloadScorecardPDF(scorecard: ScorecardPDFInput): void {
+  buildScorecardPDFDoc(scorecard).save(scorecardPdfFilename(scorecard));
+}
+
+export async function downloadAllScorecardsZip(
+  scorecards: ScorecardPDFInput[],
+  options?: { zipFilenamePrefix?: string }
+): Promise<void> {
+  if (scorecards.length === 0) return;
+
+  const zip = new JSZip();
+  for (const scorecard of scorecards) {
+    const doc = buildScorecardPDFDoc(scorecard);
+    zip.file(scorecardPdfFilename(scorecard), doc.output("arraybuffer"));
+  }
+
+  const zipPrefix = options?.zipFilenamePrefix ?? "BEEPA-All-Scorecards";
+  const blob = await zip.generateAsync({ type: "blob" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${zipPrefix}-${pdfGeneratedDateFilenamePart()}.zip`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+export async function downloadContactVerificationScorecardsZip(
+  scorecards: ScorecardPDFInput[]
+): Promise<number> {
+  const filtered = filterContactVerificationScorecards(scorecards);
+  if (filtered.length === 0) return 0;
+  await downloadAllScorecardsZip(filtered, {
+    zipFilenamePrefix: "BEEPA-Contact-Verification-MDAs",
+  });
+  return filtered.length;
 }

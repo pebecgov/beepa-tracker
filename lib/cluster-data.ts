@@ -141,7 +141,7 @@ export const CLUSTERS: Cluster[] = [
         id: "ports-customs",
         name: "Ports and Customs Efficiency Committee",
         meetingTime: "Thursday 29/01/26 11:00am",
-        lead: "Charles Wakji",
+        lead: "Aimeya Okphebholo",
         members: [
             { name: "National Drug Law Enforcement Agency (NDLEA)" },
             { name: "National Inland Waterways Authority (NIWA)" },
@@ -177,7 +177,7 @@ export const CLUSTERS: Cluster[] = [
         members: [
             { name: "Advertising Regulatory Council of Nigeria (ARCON)" },
             { name: "Federal Competition and Consumer Protection Commission (FCCPC)" },
-            { name: "Nigeria Broadcasting Commission (NBC)" },
+            { name: "National Broadcasting Commission (NBC)" },
         ],
     },
 ];

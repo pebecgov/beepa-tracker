@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useState } from "react";
-import { useQuery } from "convex/react";
+import { useConvex, useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import Link from "next/link";
 
@@ -21,7 +21,13 @@ import {
   type SuperMdaBonusNarrative,
 } from "@/lib/beepa-super-bonus-narratives";
 import { formatDate, formatScore } from "@/lib/utils";
-import { downloadGeneralReportPDF } from "@/lib/pdf-export";
+import {
+  downloadAllScorecardsZip,
+  downloadContactVerificationScorecardsZip,
+  downloadGeneralReportPDF,
+} from "@/lib/pdf-export";
+import { MDA_CONTACT_VERIFICATION_RECORDS } from "@/lib/mda-contact-verification";
+import { toast } from "sonner";
 
 function TierBadge({ label }: { label: string }) {
   const className =
@@ -94,8 +100,12 @@ function BonusNarrativeCard({
 
 export default function GeneralReportPage() {
   const { isAdmin, isLoading } = useAppUser();
+  const convex = useConvex();
   const report = useQuery(api.performance.getGeneralReport);
   const [downloading, setDownloading] = useState(false);
+  const [downloadingScorecards, setDownloadingScorecards] = useState(false);
+  const [downloadingContactZip, setDownloadingContactZip] = useState(false);
+  const zipBusy = downloading || downloadingScorecards || downloadingContactZip;
 
   const handleDownload = async () => {
     if (!report) return;
@@ -104,6 +114,44 @@ export default function GeneralReportPage() {
       downloadGeneralReportPDF(report);
     } finally {
       setDownloading(false);
+    }
+  };
+
+  const handleDownloadAllScorecards = async () => {
+    setDownloadingScorecards(true);
+    try {
+      const scorecards = await convex.query(api.performance.getAllMDAReportCards, {});
+      if (!scorecards?.length) {
+        toast.error("No scorecards available to download.");
+        return;
+      }
+      await downloadAllScorecardsZip(scorecards);
+      toast.success(`Downloaded ${scorecards.length} scorecards as ZIP.`);
+    } catch {
+      toast.error("Failed to generate scorecard ZIP. Please try again.");
+    } finally {
+      setDownloadingScorecards(false);
+    }
+  };
+
+  const handleDownloadContactVerificationZip = async () => {
+    setDownloadingContactZip(true);
+    try {
+      const scorecards = await convex.query(api.performance.getAllMDAReportCards, {});
+      if (!scorecards?.length) {
+        toast.error("No scorecards available to download.");
+        return;
+      }
+      const count = await downloadContactVerificationScorecardsZip(scorecards);
+      if (count === 0) {
+        toast.error("No contact-verification MDAs found in the current data.");
+        return;
+      }
+      toast.success(`Downloaded ${count} contact-verification scorecards as ZIP.`);
+    } catch {
+      toast.error("Failed to generate contact-verification ZIP. Please try again.");
+    } finally {
+      setDownloadingContactZip(false);
     }
   };
 
@@ -163,10 +211,27 @@ export default function GeneralReportPage() {
             </Link>
             <button
               onClick={handleDownload}
-              disabled={downloading}
+              disabled={zipBusy}
               className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#006B3F] bg-white border border-[#006B3F]/30 rounded-lg hover:bg-[#006B3F]/5 transition-colors disabled:opacity-60"
             >
               {downloading ? "Generating PDF…" : "Download PDF"}
+            </button>
+            <button
+              onClick={handleDownloadAllScorecards}
+              disabled={zipBusy}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-[#006B3F] rounded-lg hover:bg-[#005432] transition-colors disabled:opacity-60"
+            >
+              {downloadingScorecards ? "Building ZIP…" : "Download all scorecards (ZIP)"}
+            </button>
+            <button
+              onClick={handleDownloadContactVerificationZip}
+              disabled={zipBusy}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-[#006B3F] bg-white border border-[#006B3F]/40 rounded-lg hover:bg-[#006B3F]/5 transition-colors disabled:opacity-60"
+              title={MDA_CONTACT_VERIFICATION_RECORDS.map((r) => r.abbreviation).join(", ")}
+            >
+              {downloadingContactZip
+                ? "Building ZIP…"
+                : `Contact verification MDAs (${MDA_CONTACT_VERIFICATION_RECORDS.length})`}
             </button>
           </div>
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
