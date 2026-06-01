@@ -42,7 +42,7 @@ export const CLUSTERS: Cluster[] = [
         id: "business-entry",
         name: "Business Entry, Formalisation & Growth Facilitation Committee",
         meetingTime: "Thursday 29/01/26 – 10:00am",
-        lead: "Hussaina Abdulkadir",
+        lead: "Aimeya Okphebholo",
         members: [
             { name: "Bureau for Public Procurement (BPP)" },
             { name: "National Bureau of Statistics (NBS)" },
